@@ -1,12 +1,13 @@
 import { useRef, useState, useCallback } from "react";
+import type { Stroke } from "@/hooks/use-drawings";
 
 interface Props {
   isDrawMode: boolean;
   isEraserMode: boolean;
-  strokes: string[];
+  strokes: Stroke[];
   onAddStroke: (path: string) => void;
   onRemoveStroke: (index: number) => void;
-  color?: string;
+  currentColor: string;
 }
 
 function getRelativePoint(
@@ -37,7 +38,7 @@ export function DrawOverlay({
   strokes,
   onAddStroke,
   onRemoveStroke,
-  color = "#ef4444",
+  currentColor,
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const isDrawing = useRef(false);
@@ -85,6 +86,7 @@ export function DrawOverlay({
   }, [onAddStroke]);
 
   const isActive = isDrawMode || isEraserMode;
+  // Always render when there are strokes so drawings remain visible over highlighted words
   if (!isActive && strokes.length === 0) return null;
 
   const cursor = isDrawMode ? "crosshair" : isEraserMode ? "pointer" : "default";
@@ -98,7 +100,7 @@ export function DrawOverlay({
       style={{
         pointerEvents: isActive ? "auto" : "none",
         cursor,
-        zIndex: 10,
+        zIndex: 20,
       }}
       onMouseDown={handleStart}
       onMouseMove={handleMove}
@@ -111,27 +113,27 @@ export function DrawOverlay({
       onTouchMove={handleMove}
       onTouchEnd={handleEnd}
     >
-      {strokes.map((d, i) => {
+      {strokes.map((stroke, i) => {
         const isHovered = isEraserMode && hoveredIndex === i;
         return (
           <g key={i}>
-            {/* Visible stroke */}
+            {/* Visible stroke — uses the color stored with each stroke */}
             <path
-              d={d}
+              d={stroke.d}
               fill="none"
-              stroke={isHovered ? "#f97316" : color}
-              strokeWidth={isHovered ? "2.5" : "1.5"}
+              stroke={isHovered ? "#f97316" : stroke.color}
+              strokeWidth={isHovered ? "2.5" : "1.8"}
               strokeLinecap="round"
               strokeLinejoin="round"
               vectorEffect="non-scaling-stroke"
-              opacity={isHovered ? 1 : 0.85}
+              opacity={isHovered ? 1 : 0.9}
               strokeDasharray={isHovered ? "4 2" : undefined}
               style={{ transition: "stroke 0.1s, stroke-width 0.1s" }}
             />
-            {/* Wide invisible hit area for easy clicking in eraser mode */}
+            {/* Wide invisible hit area for eraser mode */}
             {isEraserMode && (
               <path
-                d={d}
+                d={stroke.d}
                 fill="none"
                 stroke="transparent"
                 strokeWidth="12"
@@ -152,17 +154,17 @@ export function DrawOverlay({
         );
       })}
 
-      {/* Stroke being drawn */}
+      {/* Stroke being drawn — uses the currently selected color */}
       {currentPath && (
         <path
           d={currentPath}
           fill="none"
-          stroke={color}
-          strokeWidth="1.5"
+          stroke={currentColor}
+          strokeWidth="1.8"
           strokeLinecap="round"
           strokeLinejoin="round"
           vectorEffect="non-scaling-stroke"
-          opacity="0.85"
+          opacity="0.9"
         />
       )}
     </svg>

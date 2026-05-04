@@ -41,7 +41,18 @@ export default function Surah() {
   const [isDrawMode, setIsDrawMode] = useState(false);
   const [isEraserMode, setIsEraserMode] = useState(false);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
+  const [penColor, setPenColor] = useState("#ef4444");
   const lastDrawnAyahKey = useRef<string>("");
+
+  const PEN_COLORS = [
+    { value: "#ef4444", label: "Red" },
+    { value: "#3b82f6", label: "Blue" },
+    { value: "#22c55e", label: "Green" },
+    { value: "#f97316", label: "Orange" },
+    { value: "#a855f7", label: "Purple" },
+    { value: "#eab308", label: "Yellow" },
+    { value: "#1a1a1a", label: "Black" },
+  ];
 
   // Reset to first page and all annotation modes off whenever the surah changes
   useEffect(() => {
@@ -59,9 +70,9 @@ export default function Surah() {
   const handleAddStroke = useCallback(
     (ayahKey: string, path: string) => {
       lastDrawnAyahKey.current = ayahKey;
-      addStroke(ayahKey, path);
+      addStroke(ayahKey, path, penColor);
     },
-    [addStroke]
+    [addStroke, penColor]
   );
 
   const handleGlobalUndo = useCallback(() => {
@@ -205,12 +216,31 @@ export default function Surah() {
             </button>
           )}
 
+          {/* Color swatches — visible when draw mode is active */}
+          {isDrawMode && (
+            <div className="flex items-center gap-1.5 ml-1">
+              {PEN_COLORS.map((c) => (
+                <button
+                  key={c.value}
+                  title={c.label}
+                  onClick={() => setPenColor(c.value)}
+                  className="rounded-full transition-transform"
+                  style={{
+                    width: 18,
+                    height: 18,
+                    backgroundColor: c.value,
+                    outline: penColor === c.value ? `2px solid ${c.value}` : "2px solid transparent",
+                    outlineOffset: 2,
+                    transform: penColor === c.value ? "scale(1.25)" : "scale(1)",
+                  }}
+                />
+              ))}
+            </div>
+          )}
+
           {/* Draw-mode secondary actions */}
           {isDrawMode && (
             <>
-              <span className="text-xs text-muted-foreground hidden sm:inline">
-                Draw circles around mistakes · double-click word still marks it red
-              </span>
               <button
                 onClick={handleGlobalUndo}
                 title="Undo last stroke"
@@ -340,6 +370,7 @@ export default function Surah() {
                       strokes={ayahStrokes}
                       onAddStroke={(path) => handleAddStroke(ayahKey, path)}
                       onRemoveStroke={(index) => removeStroke(ayahKey, index)}
+                      currentColor={penColor}
                     />
                   </div>
                 </div>
