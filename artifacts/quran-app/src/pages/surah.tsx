@@ -138,6 +138,12 @@ export default function Surah() {
     }
   };
 
+  const goToPrevSurah = () => {
+    if (surahNumber > 1) {
+      navigate(`/surah/${surahNumber - 1}`);
+    }
+  };
+
   const goToNextPage = () => {
     if (!isLastPage) {
       setCurrentPageIndex((i) => i + 1);
@@ -146,11 +152,10 @@ export default function Surah() {
     }
   };
 
-  const prevLabel = isFirstPage
-    ? surahNumber > 1
-      ? "Prev Page"
-      : null
-    : "Prev Page";
+  // Show dual prev buttons only when on the first page of a surah (not surah 1)
+  const showDualPrev = isFirstPage && surahNumber > 1;
+
+  const prevLabel = !isFirstPage ? "Prev Page" : null;
 
   const nextLabel = isLastPage
     ? surahNumber < 114
@@ -396,23 +401,37 @@ export default function Surah() {
       {/* ── Bottom navigation ── */}
       <footer className="fixed bottom-0 left-0 right-0 bg-background/90 backdrop-blur-md border-t border-border py-4 px-4 z-10">
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
-          {/* Prev button */}
-          {prevLabel ? (
+          {/* Prev side — dual buttons at surah boundary, single button mid-surah */}
+          {showDualPrev ? (
+            <div className="flex flex-col gap-1.5">
+              <Button
+                variant="outline"
+                onClick={goToPrevPage}
+                className="gap-1.5 border-border hover:border-primary/50 h-8 text-xs px-3"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Prev Page</span>
+                <span className="sm:hidden">Page</span>
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={goToPrevSurah}
+                className="gap-1.5 text-muted-foreground hover:text-foreground h-8 text-xs px-3"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Prev Surah</span>
+                <span className="sm:hidden">Surah</span>
+              </Button>
+            </div>
+          ) : prevLabel ? (
             <Button
               variant="outline"
               onClick={goToPrevPage}
-              className={cn(
-                "gap-2 border-border",
-                isFirstPage
-                  ? "hover:border-primary/50"
-                  : "hover:border-primary/50"
-              )}
+              className="gap-2 border-border hover:border-primary/50"
             >
               <ChevronLeft className="h-4 w-4" />
               <span className="hidden sm:inline">{prevLabel}</span>
-              <span className="sm:hidden">
-                {isFirstPage ? "Prev" : "Prev"}
-              </span>
+              <span className="sm:hidden">Prev</span>
             </Button>
           ) : (
             <div className="w-[100px]" />
