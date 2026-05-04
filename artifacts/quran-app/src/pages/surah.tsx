@@ -156,7 +156,7 @@ export default function Surah() {
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col pb-24">
       {/* ── Header + toolbar pinned together so both stay visible on scroll ── */}
-      <div className="sticky top-0 z-20">
+      <div className="sticky top-0 z-30">
         <header className="bg-background/90 backdrop-blur-md border-b border-border py-3 px-4 shadow-sm">
           <div className="max-w-4xl mx-auto flex items-center justify-between">
             <Link href="/">
@@ -177,7 +177,7 @@ export default function Surah() {
         </header>
 
         {/* ── Annotation toolbar ── */}
-        <div className="bg-background/95 backdrop-blur border-b border-border px-4 py-2">
+        <div className="bg-background/95 backdrop-blur border-b border-border px-4 py-2" style={{ cursor: "default" }}>
         <div className="max-w-4xl mx-auto flex items-center gap-2 flex-wrap">
           {/* Draw toggle */}
           <button
@@ -186,6 +186,7 @@ export default function Surah() {
               setIsEraserMode(false);
             }}
             title={isDrawMode ? "Exit draw mode" : "Draw circles around mistakes"}
+            style={{ cursor: "pointer" }}
             className={cn(
               "flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md border transition-colors",
               isDrawMode
@@ -205,6 +206,7 @@ export default function Surah() {
                 setIsDrawMode(false);
               }}
               title={isEraserMode ? "Exit eraser" : "Click individual strokes to erase them"}
+              style={{ cursor: "pointer" }}
               className={cn(
                 "flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md border transition-colors",
                 isEraserMode
@@ -228,6 +230,7 @@ export default function Surah() {
                   onClick={() => setPenColor(c.value)}
                   className="rounded-full transition-all duration-100 focus:outline-none"
                   style={{
+                    cursor: "pointer",
                     width: penColor === c.value ? 22 : 18,
                     height: penColor === c.value ? 22 : 18,
                     backgroundColor: c.value,
@@ -246,6 +249,7 @@ export default function Surah() {
               <button
                 onClick={handleGlobalUndo}
                 title="Undo last stroke"
+                style={{ cursor: "pointer" }}
                 className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
               >
                 <Undo2 size={13} /> Undo
@@ -254,6 +258,7 @@ export default function Surah() {
                 <button
                   onClick={clearAllDrawings}
                   title="Clear all drawings on this surah"
+                  style={{ cursor: "pointer" }}
                   className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-md border border-border text-muted-foreground hover:text-destructive hover:border-destructive/40 hover:bg-destructive/5 transition-colors"
                 >
                   <Trash2 size={13} /> Clear all
