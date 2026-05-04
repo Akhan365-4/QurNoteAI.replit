@@ -265,12 +265,14 @@ export default function Surah() {
         {/* Ayahs for this page */}
         <div className="space-y-12 sm:space-y-16">
           {currentPage.ayahs.map((ayah) => {
-            // Strip Bismillah from ayah 1 text — it's already shown in the banner above
-            let textToDisplay = ayah.text;
-            if (ayah.numberInSurah === 1 && showBismillah && textToDisplay.startsWith(BISMILLAH)) {
-              textToDisplay = textToDisplay.replace(BISMILLAH, "").trim();
-            }
-            const words = textToDisplay.split(/\s+/).filter(Boolean);
+            // Strip the Bismillah (always exactly 4 words) from the start of ayah 1.
+            // We slice by word count rather than string matching because the API can use
+            // slightly different Unicode alef forms (ٱ vs ا) across different surahs.
+            const rawWords = ayah.text.split(/\s+/).filter(Boolean);
+            const words =
+              ayah.numberInSurah === 1 && showBismillah && rawWords.length > 4
+                ? rawWords.slice(4)
+                : rawWords;
             const ayahKey = `${surahNumber}-${ayah.numberInSurah}`;
             const ayahStrokes = drawings[ayahKey] ?? [];
             const ayahNote = notes[ayahKey] ?? "";
