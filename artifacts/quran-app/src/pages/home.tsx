@@ -1,20 +1,37 @@
 import { useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useSurahList } from "@/hooks/use-quran";
 import { useMistakes } from "@/hooks/use-mistakes";
 import { JUZ_DATA } from "@/data/juz";
+import { pageToSurah, QURAN_TOTAL_PAGES } from "@/data/page-to-surah";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Loader2, Search, Trash2, BookOpen, BookMarked } from "lucide-react";
+import { Loader2, Search, Trash2, BookOpen, BookMarked, FileText, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type Tab = "surahs" | "juz";
 
 export default function Home() {
+  const [, navigate] = useLocation();
   const { data: surahs, isLoading, error } = useSurahList();
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<Tab>("surahs");
   const { mistakes, clearMistakes } = useMistakes();
+
+  // Go-to-page state
+  const [pageInput, setPageInput] = useState("");
+  const [pageError, setPageError] = useState("");
+
+  const handleGoToPage = () => {
+    const n = parseInt(pageInput, 10);
+    if (!pageInput || isNaN(n) || n < 1 || n > QURAN_TOTAL_PAGES) {
+      setPageError(`Enter a page between 1 and ${QURAN_TOTAL_PAGES}`);
+      return;
+    }
+    setPageError("");
+    const surah = pageToSurah(n);
+    navigate(`/surah/${surah}?startQuranPage=${n}`);
+  };
 
   const filteredSurahs = surahs?.filter((s) => {
     const q = search.toLowerCase();
@@ -113,6 +130,40 @@ export default function Home() {
       </div>
 
       <main className="flex-1 py-8 px-4 sm:px-6 max-w-4xl mx-auto w-full">
+
+        {/* ── Go to Page ── */}
+        <div className="mb-8 bg-card border border-border rounded-xl p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex items-center gap-2 text-sm font-medium text-foreground shrink-0">
+            <FileText size={16} className="text-primary" />
+            Go to page
+          </div>
+          <div className="flex items-center gap-2 flex-1">
+            <Input
+              type="number"
+              min={1}
+              max={QURAN_TOTAL_PAGES}
+              placeholder={`1 – ${QURAN_TOTAL_PAGES}`}
+              value={pageInput}
+              onChange={(e) => { setPageInput(e.target.value); setPageError(""); }}
+              onKeyDown={(e) => e.key === "Enter" && handleGoToPage()}
+              className="w-36 bg-background border-muted/50 focus-visible:ring-primary [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            />
+            <Button
+              onClick={handleGoToPage}
+              size="sm"
+              className="gap-1.5 cursor-pointer"
+            >
+              Open <ArrowRight size={14} />
+            </Button>
+            {pageError && (
+              <span className="text-xs text-destructive">{pageError}</span>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground sm:text-right">
+            Standard Mushaf · {QURAN_TOTAL_PAGES} pages
+          </p>
+        </div>
+
         {/* ── Surahs tab ── */}
         {tab === "surahs" && (
           isLoading ? (
