@@ -25,6 +25,8 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+const BISMILLAH = "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ";
+
 export default function Surah() {
   const { number } = useParams();
   const [, navigate] = useLocation();
@@ -108,6 +110,8 @@ export default function Surah() {
   const currentPage = pages[clampedIndex];
   const isFirstPage = clampedIndex === 0;
   const isLastPage = clampedIndex === totalPages - 1;
+  // No Bismillah banner for Al-Fatiha (it IS the Bismillah) or At-Tawbah (no Bismillah)
+  const showBismillah = surahNumber !== 1 && surahNumber !== 9;
 
   // Navigation handlers
   const goToPrevPage = () => {
@@ -237,6 +241,15 @@ export default function Surah() {
 
       {/* ── Reading content ── */}
       <main className="flex-1 max-w-4xl mx-auto w-full px-4 sm:px-8 py-10 md:py-16">
+        {/* Bismillah banner — first page of each surah (except Al-Fatiha & At-Tawbah) */}
+        {showBismillah && isFirstPage && (
+          <div className="text-center mb-16 pb-8 border-b border-border/50">
+            <h2 className="font-serif text-3xl sm:text-4xl text-primary leading-loose" dir="rtl">
+              {BISMILLAH}
+            </h2>
+          </div>
+        )}
+
         {/* Page label */}
         <div className="flex items-center gap-3 mb-12">
           <div className="flex-1 h-px bg-border" />
@@ -252,7 +265,12 @@ export default function Surah() {
         {/* Ayahs for this page */}
         <div className="space-y-12 sm:space-y-16">
           {currentPage.ayahs.map((ayah) => {
-            const words = ayah.text.split(/\s+/).filter(Boolean);
+            // Strip Bismillah from ayah 1 text — it's already shown in the banner above
+            let textToDisplay = ayah.text;
+            if (ayah.numberInSurah === 1 && showBismillah && textToDisplay.startsWith(BISMILLAH)) {
+              textToDisplay = textToDisplay.replace(BISMILLAH, "").trim();
+            }
+            const words = textToDisplay.split(/\s+/).filter(Boolean);
             const ayahKey = `${surahNumber}-${ayah.numberInSurah}`;
             const ayahStrokes = drawings[ayahKey] ?? [];
             const ayahNote = notes[ayahKey] ?? "";
