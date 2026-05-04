@@ -144,6 +144,12 @@ export default function Surah() {
     }
   };
 
+  const goToNextSurah = () => {
+    if (surahNumber < 114) {
+      navigate(`/surah/${surahNumber + 1}`);
+    }
+  };
+
   const goToNextPage = () => {
     if (!isLastPage) {
       setCurrentPageIndex((i) => i + 1);
@@ -152,16 +158,17 @@ export default function Surah() {
     }
   };
 
-  // Show dual prev buttons only when on the first page of a surah (not surah 1)
+  // Show dual buttons at surah boundaries
   const showDualPrev = isFirstPage && surahNumber > 1;
+  const showDualNext = isFirstPage && surahNumber < 114;
 
   const prevLabel = !isFirstPage ? "Prev Page" : null;
 
-  const nextLabel = isLastPage
-    ? surahNumber < 114
-      ? "Next Surah"
-      : null
-    : "Next Page";
+  const nextLabel = !isFirstPage
+    ? isLastPage
+      ? surahNumber < 114 ? "Next Surah" : null
+      : "Next Page"
+    : null;
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col pb-24">
@@ -447,17 +454,36 @@ export default function Surah() {
             </p>
           </div>
 
-          {/* Next button */}
-          {nextLabel ? (
+          {/* Next side — dual buttons at surah start, single button mid-surah */}
+          {showDualNext ? (
+            <div className="flex flex-col gap-1.5 items-end">
+              <Button
+                variant="outline"
+                onClick={goToNextPage}
+                className="gap-1.5 border-border hover:border-primary/50 h-8 text-xs px-3"
+              >
+                <span className="hidden sm:inline">Next Page</span>
+                <span className="sm:hidden">Page</span>
+                <ChevronRight className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={goToNextSurah}
+                className="gap-1.5 text-muted-foreground hover:text-foreground h-8 text-xs px-3"
+              >
+                <span className="hidden sm:inline">Next Surah</span>
+                <span className="sm:hidden">Surah</span>
+                <ChevronRight className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          ) : nextLabel ? (
             <Button
               variant="outline"
               onClick={goToNextPage}
               className="gap-2 border-border hover:border-primary/50"
             >
               <span className="hidden sm:inline">{nextLabel}</span>
-              <span className="sm:hidden">
-                {isLastPage ? "Next" : "Next"}
-              </span>
+              <span className="sm:hidden">Next</span>
               <ChevronRight className="h-4 w-4" />
             </Button>
           ) : (
