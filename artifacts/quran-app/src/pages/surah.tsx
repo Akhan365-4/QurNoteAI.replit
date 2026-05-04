@@ -31,7 +31,11 @@ export default function Surah() {
   const { number } = useParams();
   const [, navigate] = useLocation();
   const search = useSearch();
-  const startAtLast = new URLSearchParams(search).get("startPage") === "last";
+  const searchParams = new URLSearchParams(search);
+  const startAtLast = searchParams.get("startPage") === "last";
+  const startQuranPage = searchParams.get("startQuranPage")
+    ? parseInt(searchParams.get("startQuranPage")!, 10)
+    : null;
   const surahNumber = parseInt(number || "1", 10);
 
   const { data: surah, isLoading, error } = useSurahDetails(surahNumber);
@@ -65,6 +69,20 @@ export default function Surah() {
     setIsEraserMode(false);
     window.scrollTo(0, 0);
   }, [surahNumber]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // When a specific Quran page is requested (juz navigation), jump to it
+  // once the surah data is available so we can find the matching page index.
+  useEffect(() => {
+    if (!startQuranPage || !surah) return;
+    const pages: number[] = [];
+    for (const ayah of surah.ayahs) {
+      if (pages.length === 0 || pages[pages.length - 1] !== ayah.page) {
+        pages.push(ayah.page);
+      }
+    }
+    const idx = pages.findIndex((p) => p >= startQuranPage);
+    if (idx !== -1) setCurrentPageIndex(idx);
+  }, [startQuranPage, surah]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Scroll to top on every page turn
   useEffect(() => {
