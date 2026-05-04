@@ -133,7 +133,8 @@ export default function Surah() {
     if (!isFirstPage) {
       setCurrentPageIndex((i) => i - 1);
     } else if (surahNumber > 1) {
-      navigate(`/surah/${surahNumber - 1}`);
+      // Go to the LAST page of the previous surah
+      navigate(`/surah/${surahNumber - 1}?startPage=last`);
     }
   };
 
@@ -147,7 +148,7 @@ export default function Surah() {
 
   const prevLabel = isFirstPage
     ? surahNumber > 1
-      ? "Prev Surah"
+      ? "Prev Page"
       : null
     : "Prev Page";
 
