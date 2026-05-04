@@ -155,28 +155,29 @@ export default function Surah() {
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col pb-24">
-      {/* ── Header ── */}
-      <header className="sticky top-0 z-20 bg-background/90 backdrop-blur-md border-b border-border py-3 px-4 shadow-sm">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <Link href="/">
-            <Button variant="ghost" size="icon" className="hover:bg-muted" title="Back to surahs">
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-          </Link>
+      {/* ── Header + toolbar pinned together so both stay visible on scroll ── */}
+      <div className="sticky top-0 z-20">
+        <header className="bg-background/90 backdrop-blur-md border-b border-border py-3 px-4 shadow-sm">
+          <div className="max-w-4xl mx-auto flex items-center justify-between">
+            <Link href="/">
+              <Button variant="ghost" size="icon" className="hover:bg-muted" title="Back to surahs">
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+            </Link>
 
-          <div className="text-center flex-1">
-            <h1 className="font-serif text-2xl text-primary font-bold">{surah.name}</h1>
-            <p className="text-xs text-muted-foreground font-medium tracking-widest uppercase mt-1">
-              {surah.englishName}
-            </p>
+            <div className="text-center flex-1">
+              <h1 className="font-serif text-2xl text-primary font-bold">{surah.name}</h1>
+              <p className="text-xs text-muted-foreground font-medium tracking-widest uppercase mt-1">
+                {surah.englishName}
+              </p>
+            </div>
+
+            <div className="w-10" />
           </div>
+        </header>
 
-          <div className="w-10" />
-        </div>
-      </header>
-
-      {/* ── Annotation toolbar ── */}
-      <div className="sticky top-[57px] z-10 bg-background/95 backdrop-blur border-b border-border px-4 py-2">
+        {/* ── Annotation toolbar ── */}
+        <div className="bg-background/95 backdrop-blur border-b border-border px-4 py-2">
         <div className="max-w-4xl mx-auto flex items-center gap-2 flex-wrap">
           {/* Draw toggle */}
           <button
@@ -216,22 +217,23 @@ export default function Surah() {
             </button>
           )}
 
-          {/* Color swatches — visible when draw mode is active */}
+          {/* Color swatches — visible when draw mode is active; hover selects instantly */}
           {isDrawMode && (
-            <div className="flex items-center gap-1.5 ml-1">
+            <div className="flex items-center gap-2 ml-1">
               {PEN_COLORS.map((c) => (
                 <button
                   key={c.value}
                   title={c.label}
+                  onMouseEnter={() => setPenColor(c.value)}
                   onClick={() => setPenColor(c.value)}
-                  className="rounded-full transition-transform"
+                  className="rounded-full transition-all duration-100 focus:outline-none"
                   style={{
-                    width: 18,
-                    height: 18,
+                    width: penColor === c.value ? 22 : 18,
+                    height: penColor === c.value ? 22 : 18,
                     backgroundColor: c.value,
-                    outline: penColor === c.value ? `2px solid ${c.value}` : "2px solid transparent",
-                    outlineOffset: 2,
-                    transform: penColor === c.value ? "scale(1.25)" : "scale(1)",
+                    boxShadow: penColor === c.value
+                      ? `0 0 0 2px white, 0 0 0 4px ${c.value}`
+                      : "none",
                   }}
                 />
               ))}
@@ -266,6 +268,7 @@ export default function Surah() {
               Hover over a stroke to highlight it, then click to erase it
             </span>
           )}
+        </div>
         </div>
       </div>
 
