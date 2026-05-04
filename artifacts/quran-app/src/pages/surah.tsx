@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from "react";
-import { Link, useParams, useLocation } from "wouter";
+import { Link, useParams, useLocation, useSearch } from "wouter";
 import { useSurahDetails } from "@/hooks/use-quran";
 import { useMistakes } from "@/hooks/use-mistakes";
 import { useDrawings } from "@/hooks/use-drawings";
@@ -30,6 +30,8 @@ const BISMILLAH = "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَ
 export default function Surah() {
   const { number } = useParams();
   const [, navigate] = useLocation();
+  const search = useSearch();
+  const startAtLast = new URLSearchParams(search).get("startPage") === "last";
   const surahNumber = parseInt(number || "1", 10);
 
   const { data: surah, isLoading, error } = useSurahDetails(surahNumber);
@@ -54,13 +56,15 @@ export default function Surah() {
     { value: "#1a1a1a", label: "Black" },
   ];
 
-  // Reset to first page and all annotation modes off whenever the surah changes
+  // Reset annotation modes and set start page whenever the surah changes.
+  // Setting a very large index when startAtLast is true means it will clamp
+  // to totalPages - 1 automatically once surah data loads.
   useEffect(() => {
-    setCurrentPageIndex(0);
+    setCurrentPageIndex(startAtLast ? 99999 : 0);
     setIsDrawMode(false);
     setIsEraserMode(false);
     window.scrollTo(0, 0);
-  }, [surahNumber]);
+  }, [surahNumber]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Scroll to top on every page turn
   useEffect(() => {
