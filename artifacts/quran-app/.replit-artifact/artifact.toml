@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Quran App"
+version = "1.0.0"
+id = "artifacts/quran-app"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 18306
+
+[services.development]
+run = "pnpm --filter @workspace/quran-app run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/quran-app", "run", "build" ]
+publicDir = "artifacts/quran-app/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18306"
+BASE_PATH = "/"
