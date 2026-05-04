@@ -44,5 +44,17 @@ export function useMistakes() {
     localStorage.removeItem(STORAGE_KEY);
   }, []);
 
-  return { mistakes, toggleMistake, clearMistakes, isLoaded };
+  // Remove only the mistakes whose IDs are in the supplied set (current page)
+  const clearPageMistakes = useCallback((wordIds: string[]) => {
+    setMistakes((prev) => {
+      const next = new Set(prev);
+      for (const id of wordIds) next.delete(id);
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(next)));
+      } catch {}
+      return next;
+    });
+  }, []);
+
+  return { mistakes, toggleMistake, clearMistakes, clearPageMistakes, isLoaded };
 }

@@ -35,7 +35,7 @@ export default function Surah() {
   const surahNumber = parseInt(number || "1", 10);
 
   const { data: surah, isLoading, error } = useSurahDetails(surahNumber);
-  const { mistakes, toggleMistake } = useMistakes();
+  const { mistakes, toggleMistake, clearPageMistakes } = useMistakes();
   const { drawings, addStroke, undoStroke, removeStroke, clearAllDrawings, hasAnyDrawings } =
     useDrawings(surahNumber);
   const { notes, setNote } = useNotes(surahNumber);
@@ -157,6 +157,17 @@ export default function Surah() {
       navigate(`/surah/${surahNumber + 1}`);
     }
   };
+
+  // Collect every word ID visible on the current page so we can count/clear mistakes
+  const pageWordIds: string[] = currentPage.ayahs.flatMap((ayah) => {
+    const rawWords = ayah.text.split(/\s+/).filter(Boolean);
+    const words =
+      ayah.numberInSurah === 1 && showBismillah && rawWords.length > 4
+        ? rawWords.slice(4)
+        : rawWords;
+    return words.map((_, wIdx) => `${surahNumber}-${ayah.numberInSurah}-${wIdx}`);
+  });
+  const pageMistakeCount = pageWordIds.filter((id) => mistakes.has(id)).length;
 
   // Show dual buttons at surah boundaries
   const showDualPrev = isFirstPage && surahNumber > 1;
@@ -305,14 +316,32 @@ export default function Surah() {
           </div>
         )}
 
-        {/* Page label */}
+        {/* Page label + mistake counter */}
         <div className="flex items-center gap-3 mb-12">
           <div className="flex-1 h-px bg-border" />
-          <div className="flex items-center gap-1.5 text-[10px] font-semibold tracking-[0.18em] uppercase text-muted-foreground/70 select-none">
-            <BookOpen size={11} />
-            <span>Quran Page {currentPage.page}</span>
-            <span className="opacity-50">·</span>
-            <span>{clampedIndex + 1} / {totalPages}</span>
+          <div className="flex items-center gap-2 select-none">
+            <div className="flex items-center gap-1.5 text-[10px] font-semibold tracking-[0.18em] uppercase text-muted-foreground/70">
+              <BookOpen size={11} />
+              <span>Quran Page {currentPage.page}</span>
+              <span className="opacity-50">·</span>
+              <span>{clampedIndex + 1} / {totalPages}</span>
+            </div>
+
+            {/* Mistake counter — only shown when there are mistakes on this page */}
+            {pageMistakeCount > 0 && (
+              <div className="flex items-center gap-1.5 pl-2 border-l border-border/60">
+                <span className="inline-flex items-center gap-1 bg-destructive/10 text-destructive text-[10px] font-bold px-2 py-0.5 rounded-full">
+                  {pageMistakeCount} {pageMistakeCount === 1 ? "mistake" : "mistakes"}
+                </span>
+                <button
+                  onClick={() => clearPageMistakes(pageWordIds)}
+                  title="Clear all mistakes on this page"
+                  className="text-[10px] font-medium text-muted-foreground hover:text-destructive transition-colors cursor-pointer"
+                >
+                  Reset
+                </button>
+              </div>
+            )}
           </div>
           <div className="flex-1 h-px bg-border" />
         </div>
