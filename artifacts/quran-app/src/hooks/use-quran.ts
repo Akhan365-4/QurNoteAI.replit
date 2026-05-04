@@ -13,6 +13,7 @@ export interface Ayah {
   number: number;
   text: string;
   numberInSurah: number;
+  page: number;
 }
 
 export interface SurahDetails extends SurahBase {

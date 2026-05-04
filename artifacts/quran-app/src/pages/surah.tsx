@@ -159,92 +159,116 @@ export default function Surah() {
           </div>
         )}
 
-        <div className="space-y-12 sm:space-y-16">
-          {surah.ayahs.map((ayah) => {
-            let textToDisplay = ayah.text;
-            if (
-              ayah.numberInSurah === 1 &&
-              showBismillah &&
-              textToDisplay.startsWith(BISMILLAH)
-            ) {
-              textToDisplay = textToDisplay.replace(BISMILLAH, "").trim();
+        {(() => {
+          // Group ayahs by Quran page number, preserving order
+          const pages: { page: number; ayahs: typeof surah.ayahs }[] = [];
+          for (const ayah of surah.ayahs) {
+            const last = pages[pages.length - 1];
+            if (last && last.page === ayah.page) {
+              last.ayahs.push(ayah);
+            } else {
+              pages.push({ page: ayah.page, ayahs: [ayah] });
             }
+          }
 
-            const words = textToDisplay.split(/\s+/).filter(Boolean);
-            const ayahKey = `${surahNumber}-${ayah.numberInSurah}`;
-            const ayahStrokes = drawings[ayahKey] ?? [];
-            const ayahNote = notes[ayahKey] ?? "";
-
-            return (
-              <div
-                key={ayah.number}
-                className="flex flex-col gap-3"
-                data-testid={`ayah-${ayah.numberInSurah}`}
-              >
-                {/* Row: note icon | arabic text */}
-                <div className="flex items-start gap-2">
-                  {/* Note column — left side */}
-                  <AyahNote
-                    ayahKey={ayahKey}
-                    value={ayahNote}
-                    onChange={(text) => setNote(ayahKey, text)}
-                  />
-
-                  {/* Arabic text + drawing overlay */}
-                  <div
-                    className={cn(
-                      "relative flex-1 rounded-sm transition-shadow",
-                      isDrawMode && "ring-1 ring-destructive/30 shadow-sm"
-                    )}
-                  >
-                    <div
-                      dir="rtl"
-                      className="text-right leading-[3.5] sm:leading-[4] select-none px-1"
-                    >
-                      {words.map((word, wIdx) => {
-                        const wordId = `${surah.number}-${ayah.numberInSurah}-${wIdx}`;
-                        const isHighlighted = mistakes.has(wordId);
-                        return (
-                          <span
-                            key={wordId}
-                            data-testid={`word-${wordId}`}
-                            onDoubleClick={
-                              isDrawMode ? undefined : () => toggleMistake(wordId)
-                            }
-                            className={cn(
-                              "font-serif text-[1.8rem] sm:text-[2.2rem] md:text-[2.5rem] px-[2px] mx-1 rounded-[3px] transition-colors duration-150 select-none inline-block",
-                              isDrawMode
-                                ? "cursor-crosshair"
-                                : "cursor-pointer hover:bg-primary/10 hover:text-primary",
-                              isHighlighted
-                                ? "bg-destructive text-destructive-foreground shadow-sm px-1 font-bold"
-                                : "text-foreground"
-                            )}
-                            title={isDrawMode ? undefined : "Double-click to mark/unmark mistake"}
-                          >
-                            {word}
-                          </span>
-                        );
-                      })}
-
-                      {/* Ayah number badge */}
-                      <span className="inline-flex items-center justify-center w-10 h-10 mx-3 rounded-full border-2 border-accent text-accent-foreground font-serif text-lg bg-accent/5 relative -top-2 select-none shadow-sm">
-                        {ayah.numberInSurah}
-                      </span>
-                    </div>
-
-                    {/* SVG drawing overlay */}
-                    <DrawOverlay
-                      isDrawMode={isDrawMode}
-                      strokes={ayahStrokes}
-                      onAddStroke={(path) => handleAddStroke(ayahKey, path)}
-                    />
-                  </div>
-                </div>
+          return pages.map(({ page, ayahs: pageAyahs }) => (
+            <div key={page} className="space-y-12 sm:space-y-16">
+              {/* Page divider */}
+              <div className="flex items-center gap-3 -mx-2">
+                <div className="flex-1 h-px bg-border" />
+                <span className="text-[10px] font-semibold tracking-[0.18em] uppercase text-muted-foreground/70 select-none px-1">
+                  Page {page}
+                </span>
+                <div className="flex-1 h-px bg-border" />
               </div>
-            );
-          })}
-        </div>
+
+              {pageAyahs.map((ayah) => {
+                let textToDisplay = ayah.text;
+                if (
+                  ayah.numberInSurah === 1 &&
+                  showBismillah &&
+                  textToDisplay.startsWith(BISMILLAH)
+                ) {
+                  textToDisplay = textToDisplay.replace(BISMILLAH, "").trim();
+                }
+
+                const words = textToDisplay.split(/\s+/).filter(Boolean);
+                const ayahKey = `${surahNumber}-${ayah.numberInSurah}`;
+                const ayahStrokes = drawings[ayahKey] ?? [];
+                const ayahNote = notes[ayahKey] ?? "";
+
+                return (
+                  <div
+                    key={ayah.number}
+                    className="flex flex-col gap-3"
+                    data-testid={`ayah-${ayah.numberInSurah}`}
+                  >
+                    {/* Row: note icon | arabic text */}
+                    <div className="flex items-start gap-2">
+                      {/* Note column — left side */}
+                      <AyahNote
+                        ayahKey={ayahKey}
+                        value={ayahNote}
+                        onChange={(text) => setNote(ayahKey, text)}
+                      />
+
+                      {/* Arabic text + drawing overlay */}
+                      <div
+                        className={cn(
+                          "relative flex-1 rounded-sm transition-shadow",
+                          isDrawMode && "ring-1 ring-destructive/30 shadow-sm"
+                        )}
+                      >
+                        <div
+                          dir="rtl"
+                          className="text-right leading-[3.5] sm:leading-[4] select-none px-1"
+                        >
+                          {words.map((word, wIdx) => {
+                            const wordId = `${surah.number}-${ayah.numberInSurah}-${wIdx}`;
+                            const isHighlighted = mistakes.has(wordId);
+                            return (
+                              <span
+                                key={wordId}
+                                data-testid={`word-${wordId}`}
+                                onDoubleClick={
+                                  isDrawMode ? undefined : () => toggleMistake(wordId)
+                                }
+                                className={cn(
+                                  "font-serif text-[1.8rem] sm:text-[2.2rem] md:text-[2.5rem] px-[2px] mx-1 rounded-[3px] transition-colors duration-150 select-none inline-block",
+                                  isDrawMode
+                                    ? "cursor-crosshair"
+                                    : "cursor-pointer hover:bg-primary/10 hover:text-primary",
+                                  isHighlighted
+                                    ? "bg-destructive text-destructive-foreground shadow-sm px-1 font-bold"
+                                    : "text-foreground"
+                                )}
+                                title={isDrawMode ? undefined : "Double-click to mark/unmark mistake"}
+                              >
+                                {word}
+                              </span>
+                            );
+                          })}
+
+                          {/* Ayah number badge */}
+                          <span className="inline-flex items-center justify-center w-10 h-10 mx-3 rounded-full border-2 border-accent text-accent-foreground font-serif text-lg bg-accent/5 relative -top-2 select-none shadow-sm">
+                            {ayah.numberInSurah}
+                          </span>
+                        </div>
+
+                        {/* SVG drawing overlay */}
+                        <DrawOverlay
+                          isDrawMode={isDrawMode}
+                          strokes={ayahStrokes}
+                          onAddStroke={(path) => handleAddStroke(ayahKey, path)}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ));
+        })()}
       </main>
 
       {/* ── Bottom navigation ── */}
