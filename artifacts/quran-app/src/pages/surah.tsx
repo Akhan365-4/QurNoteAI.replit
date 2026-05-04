@@ -11,17 +11,29 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-// Bismillah is needed for all surahs except Surah 9 (At-Tawbah)
-const BISMILLAH = "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ";
+const BISMILLAH = "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ";
+
+const ARABIC_DIGITS = ["٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"];
+
+function toArabicNumerals(n: number): string {
+  return String(n)
+    .split("")
+    .map((d) => ARABIC_DIGITS[parseInt(d, 10)])
+    .join("");
+}
+
+// U+06DD = ARABIC END OF AYAH ornament, followed by Arabic-Indic numeral
+function getAyahEndMarker(n: number): string {
+  return "\u06DD" + toArabicNumerals(n);
+}
 
 export default function Surah() {
   const { number } = useParams();
   const surahNumber = parseInt(number || "1", 10);
-  
+
   const { data: surah, isLoading, error } = useSurahDetails(surahNumber);
   const { mistakes, toggleMistake } = useMistakes();
 
-  // Scroll to top when surah changes
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [surahNumber]);
@@ -62,24 +74,26 @@ export default function Surah() {
               <ArrowLeft className="h-5 w-5" />
             </Button>
           </Link>
-          
+
           <div className="text-center flex-1">
             <h1 className="font-serif text-2xl text-primary font-bold">{surah.name}</h1>
-            <p className="text-xs text-muted-foreground font-medium tracking-widest uppercase mt-1">{surah.englishName}</p>
+            <p className="text-xs text-muted-foreground font-medium tracking-widest uppercase mt-1">
+              {surah.englishName}
+            </p>
           </div>
-          
-          <div className="w-10">
-            {/* Spacer for centering */}
-          </div>
+
+          <div className="w-10" />
         </div>
       </header>
 
       {/* Reading Content */}
       <main className="flex-1 max-w-4xl mx-auto w-full px-4 sm:px-8 py-10 md:py-16">
-        
         {showBismillah && (
           <div className="text-center mb-16 pb-8 border-b border-border/50">
-            <h2 className="font-serif text-3xl sm:text-4xl text-primary leading-loose" dir="rtl">
+            <h2
+              className="font-serif text-3xl sm:text-4xl text-primary leading-loose"
+              dir="rtl"
+            >
               {BISMILLAH}
             </h2>
           </div>
@@ -87,36 +101,46 @@ export default function Surah() {
 
         <div className="space-y-12 sm:space-y-16">
           {surah.ayahs.map((ayah) => {
-            // Surah 1 has Bismillah as ayah 1, but for other surahs the API includes
-            // Bismillah at the start of ayah 1 sometimes. We need to strip it if we already showed it.
             let textToDisplay = ayah.text;
-            if (ayah.numberInSurah === 1 && showBismillah && textToDisplay.startsWith(BISMILLAH)) {
+            if (
+              ayah.numberInSurah === 1 &&
+              showBismillah &&
+              textToDisplay.startsWith(BISMILLAH)
+            ) {
               textToDisplay = textToDisplay.replace(BISMILLAH, "").trim();
             }
 
             const words = textToDisplay.split(/\s+/).filter(Boolean);
 
             return (
-              <div 
-                key={ayah.number} 
-                className="flex flex-col gap-4 group"
+              <div
+                key={ayah.number}
+                className="flex flex-col gap-4"
                 data-testid={`ayah-${ayah.numberInSurah}`}
-                dir="rtl"
               >
-                <div className="text-right leading-[3.5] sm:leading-[4]">
+                {/*
+                  dir="rtl" on this container ensures the browser's BiDi algorithm
+                  renders Arabic spans in right-to-left order. Words from the API are
+                  in correct Quranic order; RTL layout places them correctly on screen.
+                */}
+                <div
+                  className="leading-[3.5] sm:leading-[4]"
+                  dir="rtl"
+                  style={{ textAlign: "right" }}
+                >
                   {words.map((word, wIdx) => {
                     const wordId = `${surah.number}-${ayah.numberInSurah}-${wIdx}`;
                     const isHighlighted = mistakes.has(wordId);
-                    
+
                     return (
                       <span
                         key={wordId}
                         data-testid={`word-${wordId}`}
                         onDoubleClick={() => toggleMistake(wordId)}
                         className={cn(
-                          "font-serif text-[1.8rem] sm:text-[2.2rem] md:text-[2.5rem] px-[2px] mx-1 rounded-[3px] transition-colors duration-150 cursor-pointer select-none inline-block",
-                          isHighlighted 
-                            ? "bg-destructive text-destructive-foreground shadow-sm px-1 font-bold" 
+                          "font-serif text-[1.8rem] sm:text-[2.2rem] md:text-[2.5rem] px-[2px] mx-[2px] rounded-[3px] transition-colors duration-150 cursor-pointer select-none inline",
+                          isHighlighted
+                            ? "bg-destructive text-destructive-foreground shadow-sm px-1 font-bold"
                             : "hover:bg-primary/10 hover:text-primary text-foreground"
                         )}
                         title="Double-click to mark/unmark mistake"
@@ -125,10 +149,13 @@ export default function Surah() {
                       </span>
                     );
                   })}
-                  
-                  {/* Ayah number badge */}
-                  <span className="inline-flex items-center justify-center w-10 h-10 mx-3 rounded-full border-2 border-accent text-accent-foreground font-serif text-lg bg-accent/5 relative -top-2 select-none shadow-sm">
-                    {ayah.numberInSurah}
+
+                  {/* Arabic end-of-ayah ornament ۝ with Arabic-Indic numeral */}
+                  <span
+                    className="font-serif text-[1.8rem] sm:text-[2rem] text-accent mx-2 select-none inline"
+                    title={`Ayah ${ayah.numberInSurah}`}
+                  >
+                    {getAyahEndMarker(ayah.numberInSurah)}
                   </span>
                 </div>
               </div>
@@ -149,7 +176,7 @@ export default function Surah() {
               </Button>
             </Link>
           ) : (
-            <div /> // Spacer
+            <div />
           )}
 
           <div className="text-xs font-medium text-muted-foreground">
@@ -165,7 +192,7 @@ export default function Surah() {
               </Button>
             </Link>
           ) : (
-            <div /> // Spacer
+            <div />
           )}
         </div>
       </footer>

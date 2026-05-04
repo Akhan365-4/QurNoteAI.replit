@@ -19,6 +19,19 @@ import { useSurahDetail } from "@/hooks/useQuran";
 
 const BISMILLAH = "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ";
 
+const ARABIC_DIGITS = ["٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"];
+
+function toArabicNumerals(n: number): string {
+  return String(n)
+    .split("")
+    .map((d) => ARABIC_DIGITS[parseInt(d, 10)])
+    .join("");
+}
+
+function getAyahEndMarker(n: number): string {
+  return "\u06DD" + toArabicNumerals(n);
+}
+
 export default function SurahScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const surahNumber = Number(id);
@@ -46,11 +59,11 @@ export default function SurahScreen() {
 
   const styles = makeStyles(colors);
   const topPad = Platform.OS === "web" ? 67 : insets.top;
-
   const showBismillah = surahNumber !== 9 && surahNumber !== 1;
 
   return (
     <View style={[styles.container, { paddingTop: topPad }]}>
+      {/* Header */}
       <View style={styles.header}>
         <Pressable
           onPress={() => router.back()}
@@ -83,21 +96,31 @@ export default function SurahScreen() {
               style={styles.clearBtn}
               testID="clear-mistakes-button"
             >
-              <Ionicons name="close-circle" size={18} color={colors.destructive} />
+              <Ionicons name="close-circle" size={20} color={colors.destructive} />
             </Pressable>
           )}
         </View>
       </View>
 
+      {/* Mistake hint bar */}
       {mistakeCount > 0 && (
-        <View style={[styles.mistakeBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View
+          style={[
+            styles.mistakeBar,
+            { backgroundColor: colors.card, borderColor: colors.border },
+          ]}
+        >
           <View style={[styles.dot, { backgroundColor: colors.destructive }]} />
-          <Text style={[styles.mistakeBarText, { color: colors.destructive }]} testID="mistakes-counter">
-            {mistakeCount} {mistakeCount === 1 ? "mistake" : "mistakes"} marked — tap word twice to toggle
+          <Text
+            style={[styles.mistakeBarText, { color: colors.destructive }]}
+            testID="mistakes-counter"
+          >
+            {mistakeCount} {mistakeCount === 1 ? "mistake" : "mistakes"} — double-tap word to toggle
           </Text>
         </View>
       )}
 
+      {/* Loading */}
       {isLoading && (
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={colors.primary} />
@@ -107,6 +130,7 @@ export default function SurahScreen() {
         </View>
       )}
 
+      {/* Error */}
       {isError && (
         <View style={styles.centered}>
           <Ionicons name="wifi-outline" size={48} color={colors.mutedForeground} />
@@ -124,86 +148,120 @@ export default function SurahScreen() {
         </View>
       )}
 
+      {/* Content */}
       {data && (
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={[
             styles.scrollContent,
-            { paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 20) },
+            {
+              paddingBottom:
+                insets.bottom + (Platform.OS === "web" ? 34 : 20),
+            },
           ]}
           showsVerticalScrollIndicator={false}
         >
           {showBismillah && (
-            <View style={[styles.bismillahCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Text style={[styles.bismillah, { color: colors.primary }]}>{BISMILLAH}</Text>
+            <View
+              style={[
+                styles.bismillahCard,
+                {
+                  backgroundColor: colors.card,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              <Text style={[styles.bismillah, { color: colors.primary }]}>
+                {BISMILLAH}
+              </Text>
             </View>
           )}
 
           {data.ayahs.map((ayah) => {
-            const words = ayah.text.split(" ");
+            const words = ayah.text.split(" ").filter(Boolean);
             return (
               <View
                 key={ayah.number}
-                style={[styles.ayahCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+                style={[
+                  styles.ayahCard,
+                  {
+                    backgroundColor: colors.card,
+                    borderColor: colors.border,
+                  },
+                ]}
                 testID={`ayah-${ayah.numberInSurah}`}
               >
-                <View style={[styles.ayahNumBadge, { borderColor: colors.accent }]}>
-                  <Text style={[styles.ayahNum, { color: colors.accent }]}>
-                    {ayah.numberInSurah}
-                  </Text>
-                </View>
-                <View style={styles.wordsRow}>
+                {/*
+                  Use nested <Text> inside a parent <Text> with writingDirection:"rtl"
+                  and textAlign:"right". The Unicode BiDi algorithm naturally renders
+                  Arabic words right-to-left in this mode, preserving correct word order.
+                */}
+                <Text
+                  style={[
+                    styles.ayahText,
+                    { color: colors.foreground },
+                  ]}
+                >
                   {words.map((word, wi) => {
                     const wordId = `${surahNumber}-${ayah.numberInSurah}-${wi}`;
                     const isMistake = mistakes.has(wordId);
                     return (
-                      <Pressable
+                      <Text
                         key={wordId}
                         onPress={() => handleWordPress(wordId)}
                         style={[
-                          styles.wordPill,
-                          isMistake && { backgroundColor: colors.mistakeBg },
+                          styles.wordSpan,
+                          isMistake && {
+                            backgroundColor: colors.mistakeBg,
+                            color: colors.mistakeText,
+                          },
                         ]}
                         testID={`word-${wordId}`}
                       >
-                        <Text
-                          style={[
-                            styles.wordText,
-                            { color: isMistake ? colors.mistakeText : colors.foreground },
-                          ]}
-                        >
-                          {word}
-                        </Text>
-                      </Pressable>
+                        {word + " "}
+                      </Text>
                     );
                   })}
-                </View>
+                  {/* Arabic end-of-ayah ornament ۝ with Arabic-Indic numeral */}
+                  <Text style={[styles.ayahEndMarker, { color: colors.accent }]}>
+                    {getAyahEndMarker(ayah.numberInSurah)}
+                  </Text>
+                </Text>
               </View>
             );
           })}
         </ScrollView>
       )}
 
+      {/* Bottom Nav */}
       <View
         style={[
           styles.navBar,
           {
             backgroundColor: colors.card,
             borderTopColor: colors.border,
-            paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 4),
+            paddingBottom:
+              insets.bottom + (Platform.OS === "web" ? 34 : 4),
           },
         ]}
       >
         <Pressable
-          onPress={() => surahNumber > 1 && router.replace(`/surah/${surahNumber - 1}`)}
+          onPress={() =>
+            surahNumber > 1 && router.replace(`/surah/${surahNumber - 1}`)
+          }
           style={({ pressed }) => [
             styles.navBtn,
-            { backgroundColor: colors.secondary, opacity: surahNumber <= 1 ? 0.4 : pressed ? 0.7 : 1 },
+            {
+              backgroundColor: colors.secondary,
+              opacity: surahNumber <= 1 ? 0.4 : pressed ? 0.7 : 1,
+            },
           ]}
           disabled={surahNumber <= 1}
         >
           <Ionicons name="chevron-back" size={18} color={colors.foreground} />
-          <Text style={[styles.navBtnText, { color: colors.foreground }]}>Prev</Text>
+          <Text style={[styles.navBtnText, { color: colors.foreground }]}>
+            Prev
+          </Text>
         </Pressable>
 
         <Text style={[styles.navLabel, { color: colors.mutedForeground }]}>
@@ -211,15 +269,26 @@ export default function SurahScreen() {
         </Text>
 
         <Pressable
-          onPress={() => surahNumber < 114 && router.replace(`/surah/${surahNumber + 1}`)}
+          onPress={() =>
+            surahNumber < 114 && router.replace(`/surah/${surahNumber + 1}`)
+          }
           style={({ pressed }) => [
             styles.navBtn,
-            { backgroundColor: colors.secondary, opacity: surahNumber >= 114 ? 0.4 : pressed ? 0.7 : 1 },
+            {
+              backgroundColor: colors.secondary,
+              opacity: surahNumber >= 114 ? 0.4 : pressed ? 0.7 : 1,
+            },
           ]}
           disabled={surahNumber >= 114}
         >
-          <Text style={[styles.navBtnText, { color: colors.foreground }]}>Next</Text>
-          <Ionicons name="chevron-forward" size={18} color={colors.foreground} />
+          <Text style={[styles.navBtnText, { color: colors.foreground }]}>
+            Next
+          </Text>
+          <Ionicons
+            name="chevron-forward"
+            size={18}
+            color={colors.foreground}
+          />
         </Pressable>
       </View>
     </View>
@@ -255,7 +324,7 @@ function makeStyles(colors: ReturnType<typeof useColors>) {
       fontSize: 20,
     },
     headerEng: {
-      fontSize: 12,
+      fontSize: 11,
       fontFamily: "Inter_400Regular",
       letterSpacing: 1,
     },
@@ -314,7 +383,7 @@ function makeStyles(colors: ReturnType<typeof useColors>) {
     },
     scrollContent: {
       padding: 16,
-      gap: 12,
+      gap: 14,
     },
     bismillahCard: {
       borderRadius: 12,
@@ -327,41 +396,29 @@ function makeStyles(colors: ReturnType<typeof useColors>) {
       fontSize: 24,
       textAlign: "center",
       lineHeight: 44,
+      writingDirection: "rtl",
     },
     ayahCard: {
       borderRadius: 12,
       borderWidth: 1,
-      padding: 14,
+      paddingHorizontal: 16,
+      paddingVertical: 18,
     },
-    ayahNumBadge: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
-      borderWidth: 1.5,
-      alignItems: "center",
-      justifyContent: "center",
-      marginBottom: 10,
-      alignSelf: "flex-end",
-    },
-    ayahNum: {
-      fontSize: 12,
-      fontFamily: "Inter_600SemiBold",
-    },
-    wordsRow: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      justifyContent: "flex-end",
-      gap: 4,
-    },
-    wordPill: {
-      paddingHorizontal: 4,
-      paddingVertical: 2,
-      borderRadius: 4,
-    },
-    wordText: {
-      fontSize: 22,
-      lineHeight: 40,
+    ayahText: {
+      // writingDirection + textAlign:"right" = correct RTL rendering via Unicode BiDi
+      writingDirection: "rtl",
       textAlign: "right",
+      fontSize: 24,
+      lineHeight: 46,
+    },
+    wordSpan: {
+      fontSize: 24,
+      lineHeight: 46,
+      borderRadius: 3,
+    },
+    ayahEndMarker: {
+      fontSize: 22,
+      lineHeight: 46,
     },
     navBar: {
       flexDirection: "row",
