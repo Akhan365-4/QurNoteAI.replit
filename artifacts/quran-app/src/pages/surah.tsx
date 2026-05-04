@@ -206,102 +206,120 @@ export default function Surah() {
 
         {/* ── Annotation toolbar ── */}
         <div className="bg-background/95 backdrop-blur border-b border-border px-4 py-2" style={{ cursor: "default" }}>
-        <div className="max-w-4xl mx-auto flex items-center gap-2 flex-wrap">
-          {/* Draw toggle */}
-          <button
-            onClick={() => {
-              setIsDrawMode((v) => !v);
-              setIsEraserMode(false);
-            }}
-            title={isDrawMode ? "Exit draw mode" : "Draw circles around mistakes"}
-            style={{ cursor: "pointer" }}
-            className={cn(
-              "flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md border transition-colors",
-              isDrawMode
-                ? "bg-destructive/10 border-destructive/40 text-destructive hover:bg-destructive/20"
-                : "border-border text-muted-foreground hover:text-foreground hover:bg-muted"
-            )}
-          >
-            <Pencil size={13} />
-            {isDrawMode ? "Exit Drawing" : "Draw"}
-          </button>
-
-          {/* Erase toggle — only shown when there are drawings */}
-          {hasAnyDrawings && (
+          <div className="max-w-4xl mx-auto flex items-center gap-2 flex-wrap">
+            {/* Draw toggle */}
             <button
               onClick={() => {
-                setIsEraserMode((v) => !v);
-                setIsDrawMode(false);
+                setIsDrawMode((v) => !v);
+                setIsEraserMode(false);
               }}
-              title={isEraserMode ? "Exit eraser" : "Click individual strokes to erase them"}
+              title={isDrawMode ? "Exit draw mode" : "Draw circles around mistakes"}
               style={{ cursor: "pointer" }}
               className={cn(
                 "flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md border transition-colors",
-                isEraserMode
-                  ? "bg-orange-50 border-orange-300 text-orange-600 hover:bg-orange-100"
+                isDrawMode
+                  ? "bg-destructive/10 border-destructive/40 text-destructive hover:bg-destructive/20"
                   : "border-border text-muted-foreground hover:text-foreground hover:bg-muted"
               )}
             >
-              <Eraser size={13} />
-              {isEraserMode ? "Exit Eraser" : "Erase"}
+              <Pencil size={13} />
+              {isDrawMode ? "Exit Drawing" : "Draw"}
             </button>
-          )}
 
-          {/* Color swatches — visible when draw mode is active; hover selects instantly */}
-          {isDrawMode && (
-            <div className="flex items-center gap-2 ml-1">
-              {PEN_COLORS.map((c) => (
-                <button
-                  key={c.value}
-                  title={c.label}
-                  onMouseEnter={() => setPenColor(c.value)}
-                  onClick={() => setPenColor(c.value)}
-                  className="rounded-full transition-all duration-100 focus:outline-none"
-                  style={{
-                    cursor: "pointer",
-                    width: penColor === c.value ? 22 : 18,
-                    height: penColor === c.value ? 22 : 18,
-                    backgroundColor: c.value,
-                    boxShadow: penColor === c.value
-                      ? `0 0 0 2px white, 0 0 0 4px ${c.value}`
-                      : "none",
-                  }}
-                />
-              ))}
-            </div>
-          )}
-
-          {/* Draw-mode secondary actions */}
-          {isDrawMode && (
-            <>
+            {/* Erase toggle — only shown when there are drawings */}
+            {hasAnyDrawings && (
               <button
-                onClick={handleGlobalUndo}
-                title="Undo last stroke"
+                onClick={() => {
+                  setIsEraserMode((v) => !v);
+                  setIsDrawMode(false);
+                }}
+                title={isEraserMode ? "Exit eraser" : "Click individual strokes to erase them"}
                 style={{ cursor: "pointer" }}
-                className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                className={cn(
+                  "flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md border transition-colors",
+                  isEraserMode
+                    ? "bg-orange-50 border-orange-300 text-orange-600 hover:bg-orange-100"
+                    : "border-border text-muted-foreground hover:text-foreground hover:bg-muted"
+                )}
               >
-                <Undo2 size={13} /> Undo
+                <Eraser size={13} />
+                {isEraserMode ? "Exit Eraser" : "Erase"}
               </button>
-              {hasAnyDrawings && (
-                <button
-                  onClick={clearAllDrawings}
-                  title="Clear all drawings on this surah"
-                  style={{ cursor: "pointer" }}
-                  className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-md border border-border text-muted-foreground hover:text-destructive hover:border-destructive/40 hover:bg-destructive/5 transition-colors"
-                >
-                  <Trash2 size={13} /> Clear all
-                </button>
-              )}
-            </>
-          )}
+            )}
 
-          {/* Eraser-mode hint */}
-          {isEraserMode && (
-            <span className="text-xs text-orange-500 hidden sm:inline">
-              Hover over a stroke to highlight it, then click to erase it
-            </span>
-          )}
-        </div>
+            {/* Color swatches — visible when draw mode is active; hover selects instantly */}
+            {isDrawMode && (
+              <div className="flex items-center gap-2 ml-1">
+                {PEN_COLORS.map((c) => (
+                  <button
+                    key={c.value}
+                    title={c.label}
+                    onMouseEnter={() => setPenColor(c.value)}
+                    onClick={() => setPenColor(c.value)}
+                    className="rounded-full transition-all duration-100 focus:outline-none"
+                    style={{
+                      cursor: "pointer",
+                      width: penColor === c.value ? 22 : 18,
+                      height: penColor === c.value ? 22 : 18,
+                      backgroundColor: c.value,
+                      boxShadow: penColor === c.value
+                        ? `0 0 0 2px white, 0 0 0 4px ${c.value}`
+                        : "none",
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Draw-mode secondary actions */}
+            {isDrawMode && (
+              <>
+                <button
+                  onClick={handleGlobalUndo}
+                  title="Undo last stroke"
+                  style={{ cursor: "pointer" }}
+                  className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                >
+                  <Undo2 size={13} /> Undo
+                </button>
+                {hasAnyDrawings && (
+                  <button
+                    onClick={clearAllDrawings}
+                    title="Clear all drawings on this surah"
+                    style={{ cursor: "pointer" }}
+                    className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-md border border-border text-muted-foreground hover:text-destructive hover:border-destructive/40 hover:bg-destructive/5 transition-colors"
+                  >
+                    <Trash2 size={13} /> Clear all
+                  </button>
+                )}
+              </>
+            )}
+
+            {/* Eraser-mode hint */}
+            {isEraserMode && (
+              <span className="text-xs text-orange-500 hidden sm:inline">
+                Hover over a stroke to highlight it, then click to erase it
+              </span>
+            )}
+
+            {/* Mistake counter — right-aligned, always visible when mistakes exist on this page */}
+            {pageMistakeCount > 0 && (
+              <div className="ml-auto flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 bg-destructive/10 text-destructive text-sm font-bold px-3 py-1 rounded-full border border-destructive/20">
+                  <span className="w-2 h-2 rounded-full bg-destructive" />
+                  {pageMistakeCount} {pageMistakeCount === 1 ? "mistake" : "mistakes"}
+                </span>
+                <button
+                  onClick={() => clearPageMistakes(pageWordIds)}
+                  title="Clear all mistakes on this page"
+                  style={{ cursor: "pointer" }}
+                  className="text-sm font-medium px-3 py-1 rounded-md border border-border text-muted-foreground hover:text-destructive hover:border-destructive/40 hover:bg-destructive/5 transition-colors"
+                >
+                  Reset
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -319,29 +337,11 @@ export default function Surah() {
         {/* Page label + mistake counter */}
         <div className="flex items-center gap-3 mb-12">
           <div className="flex-1 h-px bg-border" />
-          <div className="flex items-center gap-2 select-none">
-            <div className="flex items-center gap-1.5 text-[10px] font-semibold tracking-[0.18em] uppercase text-muted-foreground/70">
-              <BookOpen size={11} />
-              <span>Quran Page {currentPage.page}</span>
-              <span className="opacity-50">·</span>
-              <span>{clampedIndex + 1} / {totalPages}</span>
-            </div>
-
-            {/* Mistake counter — only shown when there are mistakes on this page */}
-            {pageMistakeCount > 0 && (
-              <div className="flex items-center gap-1.5 pl-2 border-l border-border/60">
-                <span className="inline-flex items-center gap-1 bg-destructive/10 text-destructive text-[10px] font-bold px-2 py-0.5 rounded-full">
-                  {pageMistakeCount} {pageMistakeCount === 1 ? "mistake" : "mistakes"}
-                </span>
-                <button
-                  onClick={() => clearPageMistakes(pageWordIds)}
-                  title="Clear all mistakes on this page"
-                  className="text-[10px] font-medium text-muted-foreground hover:text-destructive transition-colors cursor-pointer"
-                >
-                  Reset
-                </button>
-              </div>
-            )}
+          <div className="flex items-center gap-1.5 text-[10px] font-semibold tracking-[0.18em] uppercase text-muted-foreground/70 select-none">
+            <BookOpen size={11} />
+            <span>Quran Page {currentPage.page}</span>
+            <span className="opacity-50">·</span>
+            <span>{clampedIndex + 1} / {totalPages}</span>
           </div>
           <div className="flex-1 h-px bg-border" />
         </div>
