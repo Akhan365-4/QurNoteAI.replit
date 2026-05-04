@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from "react";
-import { Link, useParams } from "wouter";
+import { Link, useParams, useLocation } from "wouter";
 import { useSurahDetails } from "@/hooks/use-quran";
 import { useMistakes } from "@/hooks/use-mistakes";
 import { useDrawings } from "@/hooks/use-drawings";
@@ -15,6 +15,7 @@ import {
   Pencil,
   Undo2,
   Trash2,
+  BookOpen,
 } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -27,6 +28,7 @@ const BISMILLAH = "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَ
 
 export default function Surah() {
   const { number } = useParams();
+  const [, navigate] = useLocation();
   const surahNumber = parseInt(number || "1", 10);
 
   const { data: surah, isLoading, error } = useSurahDetails(surahNumber);
@@ -36,14 +38,21 @@ export default function Surah() {
   const { notes, setNote } = useNotes(surahNumber);
 
   const [isDrawMode, setIsDrawMode] = useState(false);
+  const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const lastDrawnAyahKey = useRef<string>("");
 
+  // Reset to first page and draw mode off whenever the surah changes
   useEffect(() => {
-    window.scrollTo(0, 0);
+    setCurrentPageIndex(0);
     setIsDrawMode(false);
+    window.scrollTo(0, 0);
   }, [surahNumber]);
 
-  // Wrap addStroke to track which ayah was drawn on last (for undo)
+  // Scroll to top on every page turn
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [currentPageIndex]);
+
   const handleAddStroke = useCallback(
     (ayahKey: string, path: string) => {
       lastDrawnAyahKey.current = ayahKey;
@@ -82,7 +91,52 @@ export default function Surah() {
     );
   }
 
+  // Build the pages array (grouped by Quran page number)
+  const pages: { page: number; ayahs: typeof surah.ayahs }[] = [];
+  for (const ayah of surah.ayahs) {
+    const last = pages[pages.length - 1];
+    if (last && last.page === ayah.page) {
+      last.ayahs.push(ayah);
+    } else {
+      pages.push({ page: ayah.page, ayahs: [ayah] });
+    }
+  }
+
+  const totalPages = pages.length;
+  const clampedIndex = Math.min(currentPageIndex, totalPages - 1);
+  const currentPage = pages[clampedIndex];
+  const isFirstPage = clampedIndex === 0;
+  const isLastPage = clampedIndex === totalPages - 1;
   const showBismillah = surahNumber !== 1 && surahNumber !== 9;
+
+  // Navigation handlers
+  const goToPrevPage = () => {
+    if (!isFirstPage) {
+      setCurrentPageIndex((i) => i - 1);
+    } else if (surahNumber > 1) {
+      navigate(`/surah/${surahNumber - 1}`);
+    }
+  };
+
+  const goToNextPage = () => {
+    if (!isLastPage) {
+      setCurrentPageIndex((i) => i + 1);
+    } else if (surahNumber < 114) {
+      navigate(`/surah/${surahNumber + 1}`);
+    }
+  };
+
+  const prevLabel = isFirstPage
+    ? surahNumber > 1
+      ? "Prev Surah"
+      : null
+    : "Prev Page";
+
+  const nextLabel = isLastPage
+    ? surahNumber < 114
+      ? "Next Surah"
+      : null
+    : "Next Page";
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col pb-24">
@@ -111,7 +165,7 @@ export default function Surah() {
         <div className="max-w-4xl mx-auto flex items-center gap-2 flex-wrap">
           <button
             onClick={() => setIsDrawMode((v) => !v)}
-            title={isDrawMode ? "Exit draw mode" : "Draw mode — draw circles around mistakes"}
+            title={isDrawMode ? "Exit draw mode" : "Draw circles around mistakes"}
             className={cn(
               "flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md border transition-colors",
               isDrawMode
@@ -151,7 +205,8 @@ export default function Surah() {
 
       {/* ── Reading content ── */}
       <main className="flex-1 max-w-4xl mx-auto w-full px-4 sm:px-8 py-10 md:py-16">
-        {showBismillah && (
+        {/* Bismillah — only on the first page of a surah */}
+        {showBismillah && isFirstPage && (
           <div className="text-center mb-16 pb-8 border-b border-border/50">
             <h2 className="font-serif text-3xl sm:text-4xl text-primary leading-loose" dir="rtl">
               {BISMILLAH}
@@ -159,147 +214,155 @@ export default function Surah() {
           </div>
         )}
 
-        {(() => {
-          // Group ayahs by Quran page number, preserving order
-          const pages: { page: number; ayahs: typeof surah.ayahs }[] = [];
-          for (const ayah of surah.ayahs) {
-            const last = pages[pages.length - 1];
-            if (last && last.page === ayah.page) {
-              last.ayahs.push(ayah);
-            } else {
-              pages.push({ page: ayah.page, ayahs: [ayah] });
+        {/* Page label */}
+        <div className="flex items-center gap-3 mb-12">
+          <div className="flex-1 h-px bg-border" />
+          <div className="flex items-center gap-1.5 text-[10px] font-semibold tracking-[0.18em] uppercase text-muted-foreground/70 select-none">
+            <BookOpen size={11} />
+            <span>Quran Page {currentPage.page}</span>
+            <span className="opacity-50">·</span>
+            <span>{clampedIndex + 1} / {totalPages}</span>
+          </div>
+          <div className="flex-1 h-px bg-border" />
+        </div>
+
+        {/* Ayahs for this page */}
+        <div className="space-y-12 sm:space-y-16">
+          {currentPage.ayahs.map((ayah) => {
+            let textToDisplay = ayah.text;
+            if (
+              ayah.numberInSurah === 1 &&
+              showBismillah &&
+              textToDisplay.startsWith(BISMILLAH)
+            ) {
+              textToDisplay = textToDisplay.replace(BISMILLAH, "").trim();
             }
-          }
 
-          return pages.map(({ page, ayahs: pageAyahs }) => (
-            <div key={page} className="space-y-12 sm:space-y-16">
-              {/* Page divider */}
-              <div className="flex items-center gap-3 -mx-2">
-                <div className="flex-1 h-px bg-border" />
-                <span className="text-[10px] font-semibold tracking-[0.18em] uppercase text-muted-foreground/70 select-none px-1">
-                  Page {page}
-                </span>
-                <div className="flex-1 h-px bg-border" />
-              </div>
+            const words = textToDisplay.split(/\s+/).filter(Boolean);
+            const ayahKey = `${surahNumber}-${ayah.numberInSurah}`;
+            const ayahStrokes = drawings[ayahKey] ?? [];
+            const ayahNote = notes[ayahKey] ?? "";
 
-              {pageAyahs.map((ayah) => {
-                let textToDisplay = ayah.text;
-                if (
-                  ayah.numberInSurah === 1 &&
-                  showBismillah &&
-                  textToDisplay.startsWith(BISMILLAH)
-                ) {
-                  textToDisplay = textToDisplay.replace(BISMILLAH, "").trim();
-                }
+            return (
+              <div
+                key={ayah.number}
+                className="flex flex-col gap-3"
+                data-testid={`ayah-${ayah.numberInSurah}`}
+              >
+                <div className="flex items-start gap-2">
+                  {/* Note icon — left margin */}
+                  <AyahNote
+                    ayahKey={ayahKey}
+                    value={ayahNote}
+                    onChange={(text) => setNote(ayahKey, text)}
+                  />
 
-                const words = textToDisplay.split(/\s+/).filter(Boolean);
-                const ayahKey = `${surahNumber}-${ayah.numberInSurah}`;
-                const ayahStrokes = drawings[ayahKey] ?? [];
-                const ayahNote = notes[ayahKey] ?? "";
-
-                return (
+                  {/* Arabic text + drawing overlay */}
                   <div
-                    key={ayah.number}
-                    className="flex flex-col gap-3"
-                    data-testid={`ayah-${ayah.numberInSurah}`}
+                    className={cn(
+                      "relative flex-1 rounded-sm transition-shadow",
+                      isDrawMode && "ring-1 ring-destructive/30 shadow-sm"
+                    )}
                   >
-                    {/* Row: note icon | arabic text */}
-                    <div className="flex items-start gap-2">
-                      {/* Note column — left side */}
-                      <AyahNote
-                        ayahKey={ayahKey}
-                        value={ayahNote}
-                        onChange={(text) => setNote(ayahKey, text)}
-                      />
-
-                      {/* Arabic text + drawing overlay */}
-                      <div
-                        className={cn(
-                          "relative flex-1 rounded-sm transition-shadow",
-                          isDrawMode && "ring-1 ring-destructive/30 shadow-sm"
-                        )}
-                      >
-                        <div
-                          dir="rtl"
-                          className="text-right leading-[3.5] sm:leading-[4] select-none px-1"
-                        >
-                          {words.map((word, wIdx) => {
-                            const wordId = `${surah.number}-${ayah.numberInSurah}-${wIdx}`;
-                            const isHighlighted = mistakes.has(wordId);
-                            return (
-                              <span
-                                key={wordId}
-                                data-testid={`word-${wordId}`}
-                                onDoubleClick={
-                                  isDrawMode ? undefined : () => toggleMistake(wordId)
-                                }
-                                className={cn(
-                                  "font-serif text-[1.8rem] sm:text-[2.2rem] md:text-[2.5rem] px-[2px] mx-1 rounded-[3px] transition-colors duration-150 select-none inline-block",
-                                  isDrawMode
-                                    ? "cursor-crosshair"
-                                    : "cursor-pointer hover:bg-primary/10 hover:text-primary",
-                                  isHighlighted
-                                    ? "bg-destructive text-destructive-foreground shadow-sm px-1 font-bold"
-                                    : "text-foreground"
-                                )}
-                                title={isDrawMode ? undefined : "Double-click to mark/unmark mistake"}
-                              >
-                                {word}
-                              </span>
-                            );
-                          })}
-
-                          {/* Ayah number badge */}
-                          <span className="inline-flex items-center justify-center w-10 h-10 mx-3 rounded-full border-2 border-accent text-accent-foreground font-serif text-lg bg-accent/5 relative -top-2 select-none shadow-sm">
-                            {ayah.numberInSurah}
+                    <div
+                      dir="rtl"
+                      className="text-right leading-[3.5] sm:leading-[4] select-none px-1"
+                    >
+                      {words.map((word, wIdx) => {
+                        const wordId = `${surah.number}-${ayah.numberInSurah}-${wIdx}`;
+                        const isHighlighted = mistakes.has(wordId);
+                        return (
+                          <span
+                            key={wordId}
+                            data-testid={`word-${wordId}`}
+                            onDoubleClick={
+                              isDrawMode ? undefined : () => toggleMistake(wordId)
+                            }
+                            className={cn(
+                              "font-serif text-[1.8rem] sm:text-[2.2rem] md:text-[2.5rem] px-[2px] mx-1 rounded-[3px] transition-colors duration-150 select-none inline-block",
+                              isDrawMode
+                                ? "cursor-crosshair"
+                                : "cursor-pointer hover:bg-primary/10 hover:text-primary",
+                              isHighlighted
+                                ? "bg-destructive text-destructive-foreground shadow-sm px-1 font-bold"
+                                : "text-foreground"
+                            )}
+                            title={isDrawMode ? undefined : "Double-click to mark/unmark mistake"}
+                          >
+                            {word}
                           </span>
-                        </div>
+                        );
+                      })}
 
-                        {/* SVG drawing overlay */}
-                        <DrawOverlay
-                          isDrawMode={isDrawMode}
-                          strokes={ayahStrokes}
-                          onAddStroke={(path) => handleAddStroke(ayahKey, path)}
-                        />
-                      </div>
+                      {/* Ayah number badge */}
+                      <span className="inline-flex items-center justify-center w-10 h-10 mx-3 rounded-full border-2 border-accent text-accent-foreground font-serif text-lg bg-accent/5 relative -top-2 select-none shadow-sm">
+                        {ayah.numberInSurah}
+                      </span>
                     </div>
+
+                    <DrawOverlay
+                      isDrawMode={isDrawMode}
+                      strokes={ayahStrokes}
+                      onAddStroke={(path) => handleAddStroke(ayahKey, path)}
+                    />
                   </div>
-                );
-              })}
-            </div>
-          ));
-        })()}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </main>
 
       {/* ── Bottom navigation ── */}
       <footer className="fixed bottom-0 left-0 right-0 bg-background/90 backdrop-blur-md border-t border-border py-4 px-4 z-10">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
-          {surahNumber > 1 ? (
-            <Link href={`/surah/${surahNumber - 1}`}>
-              <Button variant="outline" className="gap-2 border-border hover:border-primary/50">
-                <ChevronLeft className="h-4 w-4" />
-                <span className="hidden sm:inline">Previous Surah</span>
-                <span className="sm:hidden">Prev</span>
-              </Button>
-            </Link>
+        <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
+          {/* Prev button */}
+          {prevLabel ? (
+            <Button
+              variant="outline"
+              onClick={goToPrevPage}
+              className={cn(
+                "gap-2 border-border",
+                isFirstPage
+                  ? "hover:border-primary/50"
+                  : "hover:border-primary/50"
+              )}
+            >
+              <ChevronLeft className="h-4 w-4" />
+              <span className="hidden sm:inline">{prevLabel}</span>
+              <span className="sm:hidden">
+                {isFirstPage ? "Prev" : "Prev"}
+              </span>
+            </Button>
           ) : (
-            <div />
+            <div className="w-[100px]" />
           )}
 
-          <div className="text-xs font-medium text-muted-foreground">
-            Surah {surahNumber} of 114
+          {/* Centre label */}
+          <div className="text-center">
+            <p className="text-xs font-semibold text-foreground">
+              Page {currentPage.page}
+            </p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">
+              {clampedIndex + 1} of {totalPages} in surah
+            </p>
           </div>
 
-          {surahNumber < 114 ? (
-            <Link href={`/surah/${surahNumber + 1}`}>
-              <Button variant="outline" className="gap-2 border-border hover:border-primary/50">
-                <span className="hidden sm:inline">Next Surah</span>
-                <span className="sm:hidden">Next</span>
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </Link>
+          {/* Next button */}
+          {nextLabel ? (
+            <Button
+              variant="outline"
+              onClick={goToNextPage}
+              className="gap-2 border-border hover:border-primary/50"
+            >
+              <span className="hidden sm:inline">{nextLabel}</span>
+              <span className="sm:hidden">
+                {isLastPage ? "Next" : "Next"}
+              </span>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
           ) : (
-            <div />
+            <div className="w-[100px]" />
           )}
         </div>
       </footer>
