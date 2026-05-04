@@ -2,8 +2,10 @@ import { useRef, useState, useCallback } from "react";
 
 interface Props {
   isDrawMode: boolean;
+  isEraserMode: boolean;
   strokes: string[];
   onAddStroke: (path: string) => void;
+  onRemoveStroke: (index: number) => void;
   color?: string;
 }
 
@@ -31,13 +33,16 @@ function getRelativePoint(
 
 export function DrawOverlay({
   isDrawMode,
+  isEraserMode,
   strokes,
   onAddStroke,
+  onRemoveStroke,
   color = "#ef4444",
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const isDrawing = useRef(false);
   const [currentPath, setCurrentPath] = useState<string | null>(null);
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
   const handleStart = useCallback(
     (e: React.MouseEvent | React.TouchEvent) => {
@@ -79,7 +84,10 @@ export function DrawOverlay({
     });
   }, [onAddStroke]);
 
-  if (!isDrawMode && strokes.length === 0) return null;
+  const isActive = isDrawMode || isEraserMode;
+  if (!isActive && strokes.length === 0) return null;
+
+  const cursor = isDrawMode ? "crosshair" : isEraserMode ? "pointer" : "default";
 
   return (
     <svg
@@ -88,31 +96,63 @@ export function DrawOverlay({
       preserveAspectRatio="none"
       className="absolute inset-0 w-full h-full rounded-sm"
       style={{
-        pointerEvents: isDrawMode ? "auto" : "none",
-        cursor: isDrawMode ? "crosshair" : "default",
+        pointerEvents: isActive ? "auto" : "none",
+        cursor,
         zIndex: 10,
       }}
       onMouseDown={handleStart}
       onMouseMove={handleMove}
       onMouseUp={handleEnd}
-      onMouseLeave={handleEnd}
+      onMouseLeave={() => {
+        handleEnd();
+        setHoveredIndex(null);
+      }}
       onTouchStart={handleStart}
       onTouchMove={handleMove}
       onTouchEnd={handleEnd}
     >
-      {strokes.map((d, i) => (
-        <path
-          key={i}
-          d={d}
-          fill="none"
-          stroke={color}
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          vectorEffect="non-scaling-stroke"
-          opacity="0.85"
-        />
-      ))}
+      {strokes.map((d, i) => {
+        const isHovered = isEraserMode && hoveredIndex === i;
+        return (
+          <g key={i}>
+            {/* Visible stroke */}
+            <path
+              d={d}
+              fill="none"
+              stroke={isHovered ? "#f97316" : color}
+              strokeWidth={isHovered ? "2.5" : "1.5"}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              vectorEffect="non-scaling-stroke"
+              opacity={isHovered ? 1 : 0.85}
+              strokeDasharray={isHovered ? "4 2" : undefined}
+              style={{ transition: "stroke 0.1s, stroke-width 0.1s" }}
+            />
+            {/* Wide invisible hit area for easy clicking in eraser mode */}
+            {isEraserMode && (
+              <path
+                d={d}
+                fill="none"
+                stroke="transparent"
+                strokeWidth="12"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                vectorEffect="non-scaling-stroke"
+                style={{ cursor: "pointer" }}
+                onMouseEnter={() => setHoveredIndex(i)}
+                onMouseLeave={() => setHoveredIndex(null)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setHoveredIndex(null);
+                  onRemoveStroke(i);
+                }}
+              />
+            )}
+          </g>
+        );
+      })}
+
+      {/* Stroke being drawn */}
       {currentPath && (
         <path
           d={currentPath}

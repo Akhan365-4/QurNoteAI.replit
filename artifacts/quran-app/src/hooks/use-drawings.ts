@@ -12,11 +12,8 @@ export function useDrawings(surahNumber: number) {
     }
   });
 
-  const lastDrawnAyah = { current: "" };
-
   const addStroke = useCallback(
     (ayahKey: string, path: string) => {
-      lastDrawnAyah.current = ayahKey;
       setDrawings((prev) => {
         const updated = {
           ...prev,
@@ -37,6 +34,24 @@ export function useDrawings(surahNumber: number) {
         const strokes = prev[ayahKey] ?? [];
         if (!strokes.length) return prev;
         const updated = { ...prev, [ayahKey]: strokes.slice(0, -1) };
+        if (!updated[ayahKey].length) delete updated[ayahKey];
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(updated));
+        } catch {}
+        return updated;
+      });
+    },
+    [storageKey]
+  );
+
+  const removeStroke = useCallback(
+    (ayahKey: string, index: number) => {
+      setDrawings((prev) => {
+        const strokes = prev[ayahKey] ?? [];
+        const updated = {
+          ...prev,
+          [ayahKey]: strokes.filter((_, i) => i !== index),
+        };
         if (!updated[ayahKey].length) delete updated[ayahKey];
         try {
           localStorage.setItem(storageKey, JSON.stringify(updated));
@@ -76,6 +91,7 @@ export function useDrawings(surahNumber: number) {
     drawings,
     addStroke,
     undoStroke,
+    removeStroke,
     clearAyahDrawings,
     clearAllDrawings,
     hasAnyDrawings,

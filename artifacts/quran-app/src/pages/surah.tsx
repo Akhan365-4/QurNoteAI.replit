@@ -13,6 +13,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Pencil,
+  Eraser,
   Undo2,
   Trash2,
   BookOpen,
@@ -33,18 +34,20 @@ export default function Surah() {
 
   const { data: surah, isLoading, error } = useSurahDetails(surahNumber);
   const { mistakes, toggleMistake } = useMistakes();
-  const { drawings, addStroke, undoStroke, clearAllDrawings, hasAnyDrawings } =
+  const { drawings, addStroke, undoStroke, removeStroke, clearAllDrawings, hasAnyDrawings } =
     useDrawings(surahNumber);
   const { notes, setNote } = useNotes(surahNumber);
 
   const [isDrawMode, setIsDrawMode] = useState(false);
+  const [isEraserMode, setIsEraserMode] = useState(false);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const lastDrawnAyahKey = useRef<string>("");
 
-  // Reset to first page and draw mode off whenever the surah changes
+  // Reset to first page and all annotation modes off whenever the surah changes
   useEffect(() => {
     setCurrentPageIndex(0);
     setIsDrawMode(false);
+    setIsEraserMode(false);
     window.scrollTo(0, 0);
   }, [surahNumber]);
 
@@ -163,8 +166,12 @@ export default function Surah() {
       {/* ── Annotation toolbar ── */}
       <div className="sticky top-[57px] z-10 bg-background/95 backdrop-blur border-b border-border px-4 py-2">
         <div className="max-w-4xl mx-auto flex items-center gap-2 flex-wrap">
+          {/* Draw toggle */}
           <button
-            onClick={() => setIsDrawMode((v) => !v)}
+            onClick={() => {
+              setIsDrawMode((v) => !v);
+              setIsEraserMode(false);
+            }}
             title={isDrawMode ? "Exit draw mode" : "Draw circles around mistakes"}
             className={cn(
               "flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md border transition-colors",
@@ -177,6 +184,27 @@ export default function Surah() {
             {isDrawMode ? "Exit Drawing" : "Draw"}
           </button>
 
+          {/* Erase toggle — only shown when there are drawings */}
+          {hasAnyDrawings && (
+            <button
+              onClick={() => {
+                setIsEraserMode((v) => !v);
+                setIsDrawMode(false);
+              }}
+              title={isEraserMode ? "Exit eraser" : "Click individual strokes to erase them"}
+              className={cn(
+                "flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md border transition-colors",
+                isEraserMode
+                  ? "bg-orange-50 border-orange-300 text-orange-600 hover:bg-orange-100"
+                  : "border-border text-muted-foreground hover:text-foreground hover:bg-muted"
+              )}
+            >
+              <Eraser size={13} />
+              {isEraserMode ? "Exit Eraser" : "Erase"}
+            </button>
+          )}
+
+          {/* Draw-mode secondary actions */}
           {isDrawMode && (
             <>
               <span className="text-xs text-muted-foreground hidden sm:inline">
@@ -199,6 +227,13 @@ export default function Surah() {
                 </button>
               )}
             </>
+          )}
+
+          {/* Eraser-mode hint */}
+          {isEraserMode && (
+            <span className="text-xs text-orange-500 hidden sm:inline">
+              Hover over a stroke to highlight it, then click to erase it
+            </span>
           )}
         </div>
       </div>
@@ -302,8 +337,10 @@ export default function Surah() {
 
                     <DrawOverlay
                       isDrawMode={isDrawMode}
+                      isEraserMode={isEraserMode}
                       strokes={ayahStrokes}
                       onAddStroke={(path) => handleAddStroke(ayahKey, path)}
+                      onRemoveStroke={(index) => removeStroke(ayahKey, index)}
                     />
                   </div>
                 </div>
