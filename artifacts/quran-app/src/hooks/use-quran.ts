@@ -16,6 +16,15 @@ export interface Ayah {
   page: number;
 }
 
+export interface AyahWithSurah extends Ayah {
+  surah: SurahBase;
+}
+
+export interface PageSection {
+  surah: SurahBase;
+  ayahs: AyahWithSurah[];
+}
+
 export interface SurahDetails extends SurahBase {
   ayahs: Ayah[];
 }
@@ -42,5 +51,33 @@ export function useSurahDetails(number: number) {
       return data.data;
     },
     enabled: !!number,
+  });
+}
+
+export function useQuranPage(pageNumber: number | null) {
+  return useQuery({
+    queryKey: ["quran-page", pageNumber],
+    queryFn: async (): Promise<PageSection[]> => {
+      const res = await fetch(
+        `https://api.alquran.cloud/v1/page/${pageNumber}/quran-uthmani`
+      );
+      if (!res.ok) throw new Error("Failed to fetch page data");
+      const json = await res.json();
+      const ayahs: AyahWithSurah[] = json.data.ayahs;
+
+      // Group into sections by surah, preserving the order they appear on the page
+      const sections: PageSection[] = [];
+      for (const ayah of ayahs) {
+        const last = sections[sections.length - 1];
+        if (last && last.surah.number === ayah.surah.number) {
+          last.ayahs.push(ayah);
+        } else {
+          sections.push({ surah: ayah.surah, ayahs: [ayah] });
+        }
+      }
+      return sections;
+    },
+    enabled: typeof pageNumber === "number" && pageNumber >= 1 && pageNumber <= 604,
+    staleTime: Infinity,
   });
 }
