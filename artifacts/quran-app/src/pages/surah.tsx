@@ -49,11 +49,6 @@ export default function Surah() {
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [penColor, setPenColor] = useState("#ef4444");
   const lastDrawnAyahKey = useRef<string>("");
-  const currentPageKeyRef = useRef<string>("");
-
-  // Convert Western numerals to Arabic-Indic numerals for ayah markers
-  const toArabicNumerals = (n: number) =>
-    n.toString().replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[parseInt(d)]);
 
   const PEN_COLORS = [
     { value: "#ef4444", label: "Red" },
@@ -95,10 +90,9 @@ export default function Surah() {
   }, [currentPageIndex]);
 
   const handleAddStroke = useCallback(
-    (path: string) => {
-      const key = currentPageKeyRef.current;
-      lastDrawnAyahKey.current = key;
-      addStroke(key, path, penColor);
+    (ayahKey: string, path: string) => {
+      lastDrawnAyahKey.current = ayahKey;
+      addStroke(ayahKey, path, penColor);
     },
     [addStroke, penColor]
   );
@@ -192,11 +186,6 @@ export default function Surah() {
     return words.map((_, wIdx) => `${surahNumber}-${ayah.numberInSurah}-${wIdx}`);
   });
   const pageMistakeCount = pageWordIds.filter((id) => mistakes.has(id)).length;
-
-  // Page-level drawing key — one overlay per Quran page
-  const pageKey = `${surahNumber}-page-${currentPage.page}`;
-  currentPageKeyRef.current = pageKey;
-  const pageStrokes = drawings[pageKey] ?? [];
 
   // Show dual buttons at surah boundaries
   const showDualPrev = isFirstPage && surahNumber > 1;
@@ -352,151 +341,110 @@ export default function Surah() {
       </div>
 
       {/* ── Reading content ── */}
-      <main className="flex-1 max-w-3xl mx-auto w-full px-3 sm:px-6 py-8 pb-36">
-
-        {/* Surah header — shown on the first page of the surah */}
-        {isFirstPage && (
-          <div className="relative flex items-center justify-center mb-6">
-            <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-px bg-amber-800/25" />
-            <div className="relative bg-background border border-amber-800/30 rounded px-6 py-2 text-center shadow-sm">
-              <div
-                dir="rtl"
-                style={{ fontFamily: "'Amiri Quran', serif" }}
-                className="text-xl text-primary font-bold leading-loose"
-              >
-                {surah.name}
-              </div>
-              <div className="text-[10px] tracking-[0.2em] uppercase text-muted-foreground mt-0.5">
-                {surah.englishName} · {surah.numberOfAyahs} Ayahs
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Bismillah — centered header for first page (not Fatiha or Tawbah) */}
+      <main className="flex-1 max-w-4xl mx-auto w-full px-4 sm:px-8 py-10 md:py-16">
+        {/* Bismillah banner — first page of each surah (except Al-Fatiha & At-Tawbah) */}
         {showBismillah && isFirstPage && (
-          <div className="text-center mb-6 py-3 border-y border-amber-800/20">
-            <p
-              dir="rtl"
-              style={{ fontFamily: "'Amiri Quran', serif", fontSize: "1.5rem", lineHeight: 2.2 }}
-              className="text-foreground select-none"
-            >
+          <div className="text-center mb-16 pb-8 border-b border-border/50">
+            <h2 className="font-serif text-3xl sm:text-4xl text-primary leading-loose" dir="rtl">
               {BISMILLAH}
-            </p>
+            </h2>
           </div>
         )}
 
-        {/* Page label */}
-        <div className="flex items-center gap-3 mb-5">
-          <div className="flex-1 h-px bg-amber-800/15" />
-          <div className="flex items-center gap-1.5 text-[10px] font-semibold tracking-[0.18em] uppercase text-muted-foreground/60 select-none">
-            <BookOpen size={10} />
-            <span>Page {currentPage.page}</span>
+        {/* Page label + mistake counter */}
+        <div className="flex items-center gap-3 mb-12">
+          <div className="flex-1 h-px bg-border" />
+          <div className="flex items-center gap-1.5 text-[10px] font-semibold tracking-[0.18em] uppercase text-muted-foreground/70 select-none">
+            <BookOpen size={11} />
+            <span>Quran Page {currentPage.page}</span>
             <span className="opacity-50">·</span>
             <span>{clampedIndex + 1} / {totalPages}</span>
           </div>
-          <div className="flex-1 h-px bg-amber-800/15" />
+          <div className="flex-1 h-px bg-border" />
         </div>
 
-        {/* ── Mushaf text block ── */}
-        <div
-          className={cn(
-            "relative rounded-sm bg-white transition-shadow",
-            isDrawMode && "ring-1 ring-destructive/30 shadow-sm"
-          )}
-          style={{ minHeight: 200 }}
-        >
-          {/* Continuous justified RTL text — all ayahs flow as one block */}
-          <div
-            dir="rtl"
-            className="select-none px-4 sm:px-8 py-4"
-            style={{
-              fontFamily: "'Amiri Quran', 'Scheherazade New', serif",
-              fontSize: "clamp(1.25rem, 3.5vw, 1.6rem)",
-              lineHeight: 3,
-              textAlign: "justify",
-              textAlignLast: "right",
-              color: "#1a1a1a",
-            }}
-          >
-            {currentPage.ayahs.map((ayah) => {
-              const rawWords = ayah.text.split(/\s+/).filter(Boolean);
-              const words =
-                ayah.numberInSurah === 1 && showBismillah && rawWords.length > 4
-                  ? rawWords.slice(4)
-                  : rawWords;
-
-              return (
-                <span key={ayah.number} data-testid={`ayah-${ayah.numberInSurah}`}>
-                  {words.map((word, wIdx) => {
-                    const wordId = `${surahNumber}-${ayah.numberInSurah}-${wIdx}`;
-                    const isHighlighted = mistakes.has(wordId);
-                    return (
-                      <span
-                        key={wordId}
-                        data-testid={`word-${wordId}`}
-                        onDoubleClick={isDrawMode ? undefined : () => toggleMistake(wordId)}
-                        style={{ cursor: isDrawMode ? "crosshair" : "pointer" }}
-                        title={isDrawMode ? undefined : "Double-click to mark/unmark mistake"}
-                        className={cn(
-                          "inline px-[2px] mx-[1px] rounded-[3px] transition-colors duration-150",
-                          !isDrawMode && "hover:bg-primary/15",
-                          isHighlighted
-                            ? "bg-destructive text-white font-bold"
-                            : ""
-                        )}
-                      >
-                        {word}
-                      </span>
-                    );
-                  })}
-                  {/* Inline ayah end marker — small ornamental circle with Arabic numeral */}
-                  <span
-                    className="inline-flex items-center justify-center rounded-full border border-amber-700/60 text-amber-800 bg-amber-50 select-none"
-                    style={{
-                      fontFamily: "serif",
-                      fontSize: "0.58rem",
-                      width: "1.5em",
-                      height: "1.5em",
-                      verticalAlign: "middle",
-                      position: "relative",
-                      top: "-0.1em",
-                      margin: "0 0.25em",
-                    }}
-                  >
-                    {toArabicNumerals(ayah.numberInSurah)}
-                  </span>
-                </span>
-              );
-            })}
-          </div>
-
-          {/* Single drawing overlay covering the full mushaf text block */}
-          <DrawOverlay
-            isDrawMode={isDrawMode}
-            isEraserMode={isEraserMode}
-            strokes={pageStrokes}
-            onAddStroke={handleAddStroke}
-            onRemoveStroke={(index) => removeStroke(pageKey, index)}
-            currentColor={penColor}
-          />
-        </div>
-
-        {/* ── Per-ayah notes strip ── */}
-        <div className="mt-6 flex flex-wrap gap-3 items-start">
+        {/* Ayahs for this page */}
+        <div className="space-y-12 sm:space-y-16">
           {currentPage.ayahs.map((ayah) => {
+            // Strip the Bismillah (always exactly 4 words) from the start of ayah 1.
+            // We slice by word count rather than string matching because the API can use
+            // slightly different Unicode alef forms (ٱ vs ا) across different surahs.
+            const rawWords = ayah.text.split(/\s+/).filter(Boolean);
+            const words =
+              ayah.numberInSurah === 1 && showBismillah && rawWords.length > 4
+                ? rawWords.slice(4)
+                : rawWords;
             const ayahKey = `${surahNumber}-${ayah.numberInSurah}`;
+            const ayahStrokes = drawings[ayahKey] ?? [];
             const ayahNote = notes[ayahKey] ?? "";
+
             return (
-              <div key={ayah.number} className="flex items-start gap-1">
-                <span className="text-[10px] text-muted-foreground/60 pt-1.5 select-none font-mono">
-                  {ayah.numberInSurah}
-                </span>
-                <AyahNote
-                  ayahKey={ayahKey}
-                  value={ayahNote}
-                  onChange={(text) => setNote(ayahKey, text)}
-                />
+              <div
+                key={ayah.number}
+                className="flex flex-col gap-3"
+                data-testid={`ayah-${ayah.numberInSurah}`}
+              >
+                <div className="flex items-start gap-2">
+                  {/* Note icon — left margin */}
+                  <AyahNote
+                    ayahKey={ayahKey}
+                    value={ayahNote}
+                    onChange={(text) => setNote(ayahKey, text)}
+                  />
+
+                  {/* Arabic text + drawing overlay */}
+                  <div
+                    className={cn(
+                      "relative flex-1 rounded-sm transition-shadow",
+                      isDrawMode && "ring-1 ring-destructive/30 shadow-sm"
+                    )}
+                  >
+                    <div
+                      dir="rtl"
+                      className="text-right leading-[3.5] sm:leading-[4] select-none px-1"
+                    >
+                      {words.map((word, wIdx) => {
+                        const wordId = `${surah.number}-${ayah.numberInSurah}-${wIdx}`;
+                        const isHighlighted = mistakes.has(wordId);
+                        return (
+                          <span
+                            key={wordId}
+                            data-testid={`word-${wordId}`}
+                            onDoubleClick={
+                              isDrawMode ? undefined : () => toggleMistake(wordId)
+                            }
+                            className={cn(
+                              "font-serif text-[1.8rem] sm:text-[2.2rem] md:text-[2.5rem] px-[2px] mx-1 rounded-[3px] transition-colors duration-150 select-none inline-block",
+                              isDrawMode
+                                ? "cursor-crosshair"
+                                : "cursor-pointer hover:bg-primary/10 hover:text-primary",
+                              isHighlighted
+                                ? "bg-destructive text-destructive-foreground shadow-sm px-1 font-bold"
+                                : "text-foreground"
+                            )}
+                            title={isDrawMode ? undefined : "Double-click to mark/unmark mistake"}
+                          >
+                            {word}
+                          </span>
+                        );
+                      })}
+
+                      {/* Ayah number badge */}
+                      <span className="inline-flex items-center justify-center w-10 h-10 mx-3 rounded-full border-2 border-accent text-accent-foreground font-serif text-lg bg-accent/5 relative -top-2 select-none shadow-sm">
+                        {ayah.numberInSurah}
+                      </span>
+                    </div>
+
+                    <DrawOverlay
+                      isDrawMode={isDrawMode}
+                      isEraserMode={isEraserMode}
+                      strokes={ayahStrokes}
+                      onAddStroke={(path) => handleAddStroke(ayahKey, path)}
+                      onRemoveStroke={(index) => removeStroke(ayahKey, index)}
+                      currentColor={penColor}
+                    />
+                  </div>
+                </div>
               </div>
             );
           })}
