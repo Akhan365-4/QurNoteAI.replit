@@ -517,7 +517,7 @@ export default function Surah() {
                                   isDrawMode ? undefined : () => toggleMistake(wordId)
                                 }
                                 className={cn(
-                                  "font-serif text-[1.8rem] sm:text-[2.2rem] md:text-[2.5rem] px-[2px] mx-1 rounded-[3px] transition-colors duration-150 select-none",
+                                  "font-serif text-[1.8rem] sm:text-[2.2rem] md:text-[2.5rem] px-[2px] mx-1 rounded-[3px] transition-colors duration-150 select-none [letter-spacing:0.04em]",
                                   isHighlighted ? "inline-block bg-red-100 text-foreground" : "inline-block text-foreground",
                                   isDrawMode
                                     ? "cursor-crosshair"
