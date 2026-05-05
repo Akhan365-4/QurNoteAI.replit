@@ -518,9 +518,7 @@ export default function Surah() {
                                 }
                                 className={cn(
                                   "font-serif text-[1.8rem] sm:text-[2.2rem] md:text-[2.5rem] px-[2px] mx-1 rounded-[3px] transition-colors duration-150 select-none",
-                                  // Use `inline` (not `inline-block`) when highlighted so the background
-                                  // tint doesn't create a solid box that clips adjacent Arabic diacritics.
-                                  isHighlighted ? "inline bg-red-100 text-foreground" : "inline-block text-foreground",
+                                  isHighlighted ? "inline-block bg-red-100 text-foreground" : "inline-block text-foreground",
                                   isDrawMode
                                     ? "cursor-crosshair"
                                     : "cursor-pointer hover:bg-primary/10 hover:text-primary",
