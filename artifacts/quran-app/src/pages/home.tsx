@@ -6,7 +6,7 @@ import { JUZ_DATA } from "@/data/juz";
 import { pageToSurah, QURAN_TOTAL_PAGES } from "@/data/page-to-surah";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Loader2, Search, Trash2, BookOpen, BookMarked, FileText, ArrowRight } from "lucide-react";
+import { Loader2, Search, Trash2, BookOpen, BookMarked, FileText, ArrowRight, Mic } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type Tab = "surahs" | "juz";
@@ -72,6 +72,18 @@ export default function Home() {
                 data-testid="search-input"
               />
             </div>
+
+            <Link href="/test">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 border-primary/30 text-primary hover:bg-primary/10 cursor-pointer shrink-0"
+                data-testid="test-mode-button"
+              >
+                <Mic className="h-4 w-4" />
+                Practice
+              </Button>
+            </Link>
 
             <div className="flex items-center gap-3">
               <div

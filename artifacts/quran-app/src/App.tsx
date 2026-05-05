@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import Surah from "@/pages/surah";
+import Test from "@/pages/test";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -20,6 +21,7 @@ function Router() {
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/surah/:number" component={Surah} />
+      <Route path="/test" component={Test} />
       <Route component={NotFound} />
     </Switch>
   );
