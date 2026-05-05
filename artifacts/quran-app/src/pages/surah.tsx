@@ -179,28 +179,47 @@ export default function Surah() {
     },
   ];
 
+  // Which surahs are already visible on this Quran page?
+  // These drive navigation so we skip past surahs that are already on-screen.
+  const firstVisibleSurahNum =
+    displaySections.length > 0
+      ? Math.min(...displaySections.map((s) => s.surah.number))
+      : surahNumber;
+  const lastVisibleSurahNum =
+    displaySections.length > 0
+      ? Math.max(...displaySections.map((s) => s.surah.number))
+      : surahNumber;
+
   // Navigation handlers
   const goToPrevPage = () => {
     if (!isFirstPage) {
       setCurrentPageIndex((i) => i - 1);
-    } else if (surahNumber > 1) {
-      navigate(`/surah/${surahNumber - 1}?startPage=last`);
+    } else if (firstVisibleSurahNum > 1) {
+      // Jump to the last page of the surah just before this Quran page starts,
+      // skipping any guest surahs that already appear at the top of this page.
+      navigate(`/surah/${firstVisibleSurahNum - 1}?startPage=last`);
     }
   };
 
   const goToPrevSurah = () => {
-    if (surahNumber > 1) navigate(`/surah/${surahNumber - 1}`);
+    if (firstVisibleSurahNum > 1) {
+      navigate(`/surah/${firstVisibleSurahNum - 1}`);
+    }
   };
 
   const goToNextSurah = () => {
-    if (surahNumber < 114) navigate(`/surah/${surahNumber + 1}`);
+    if (lastVisibleSurahNum < 114) {
+      navigate(`/surah/${lastVisibleSurahNum + 1}`);
+    }
   };
 
   const goToNextPage = () => {
     if (!isLastPage) {
       setCurrentPageIndex((i) => i + 1);
-    } else if (surahNumber < 114) {
-      navigate(`/surah/${surahNumber + 1}`);
+    } else if (lastVisibleSurahNum < 114) {
+      // Jump to the first surah that starts on the next Quran page,
+      // skipping any guest surahs already visible at the bottom of this page.
+      navigate(`/surah/${lastVisibleSurahNum + 1}`);
     }
   };
 
@@ -221,13 +240,15 @@ export default function Surah() {
   const pageMistakeCount = pageWordIds.filter((id) => mistakes.has(id)).length;
 
   // Show dual buttons at surah boundaries
-  const showDualPrev = isFirstPage && surahNumber > 1;
-  const showDualNext = isFirstPage && surahNumber < 114;
+  const showDualPrev = isFirstPage && firstVisibleSurahNum > 1;
+  // Dual next: shown at the first page so user can either go to page 2 or skip to next surah.
+  // Uses lastVisibleSurahNum so "Next Surah" skips past all surahs already on-screen.
+  const showDualNext = isFirstPage && lastVisibleSurahNum < 114;
 
   const prevLabel = !isFirstPage ? "Prev Page" : null;
   const nextLabel = !isFirstPage
     ? isLastPage
-      ? surahNumber < 114 ? "Next Surah" : null
+      ? lastVisibleSurahNum < 114 ? "Next Surah" : null
       : "Next Page"
     : null;
 
