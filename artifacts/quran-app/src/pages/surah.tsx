@@ -244,8 +244,8 @@ export default function Surah() {
               {isDrawMode ? "Exit Drawing" : "Draw"}
             </button>
 
-            {/* Erase toggle — only shown when there are drawings */}
-            {hasAnyDrawings && (
+            {/* Erase toggle — shown when there are drawings OR when already in eraser mode */}
+            {(hasAnyDrawings || isEraserMode) && (
               <button
                 onClick={() => {
                   setIsEraserMode((v) => !v);
