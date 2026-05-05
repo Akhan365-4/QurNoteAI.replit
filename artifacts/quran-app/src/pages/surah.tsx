@@ -522,7 +522,7 @@ export default function Surah() {
                                     ? "cursor-crosshair"
                                     : "cursor-pointer hover:bg-primary/10 hover:text-primary",
                                   isHighlighted
-                                    ? "bg-destructive text-destructive-foreground shadow-sm px-1 font-bold"
+                                    ? "bg-red-100 text-foreground underline decoration-red-400 decoration-wavy underline-offset-4"
                                     : "text-foreground"
                                 )}
                                 title={isDrawMode ? undefined : "Double-click to mark/unmark mistake"}
