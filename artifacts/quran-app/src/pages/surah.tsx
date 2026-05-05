@@ -50,6 +50,9 @@ export default function Surah() {
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [penColor, setPenColor] = useState("#ef4444");
   const lastDrawnAyahKey = useRef<string>("");
+  // Ref to the primary surah's section div, used to scroll into view when the
+  // page also contains a preceding guest surah above it.
+  const primarySectionRef = useRef<HTMLDivElement>(null);
 
   const PEN_COLORS = [
     { value: "#ef4444", label: "Red" },
@@ -120,6 +123,25 @@ export default function Surah() {
 
   // Fetch ALL ayahs on this Quran page — may include ayahs from adjacent surahs
   const { data: pageData } = useQuranPage(currentQuranPageNum);
+
+  // After the full-page data loads, scroll to the start of the primary surah
+  // if there are guest surahs rendered above it on the same Quran page.
+  // Deps include surahNumber so cached page data still re-triggers when the
+  // user picks a different surah on the same Quran page number.
+  useEffect(() => {
+    if (!pageData) return;
+    const hasPrimarySection = pageData.some((s) => s.surah.number === surahNumber);
+    if (!hasPrimarySection) return;
+    const hasPrecedingGuest = pageData[0]?.surah.number < surahNumber;
+    if (!hasPrecedingGuest || !primarySectionRef.current) return;
+    // Offset by sticky header + toolbar height (~128 px) so the surah name
+    // is fully visible rather than hidden behind the fixed bars.
+    const top =
+      primarySectionRef.current.getBoundingClientRect().top +
+      window.scrollY -
+      128;
+    window.scrollTo({ top, behavior: "instant" });
+  }, [pageData, surahNumber]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Early returns ──
   if (isLoading) {
@@ -405,7 +427,11 @@ export default function Surah() {
           const sectionHasBismillah = startsAtAyah1 && secNum !== 1 && secNum !== 9;
 
           return (
-            <div key={secNum} className="space-y-12 sm:space-y-16">
+            <div
+              key={secNum}
+              ref={isPrimary ? primarySectionRef : undefined}
+              className="space-y-12 sm:space-y-16"
+            >
               {/* ── Surah divider: Bismillah for primary surah's first page,
                    or full header + Bismillah for every guest surah ── */}
               {sectionHasBismillah && isPrimary && isFirstPage && (
