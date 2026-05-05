@@ -272,7 +272,6 @@ export default function Surah() {
                   <button
                     key={c.value}
                     title={c.label}
-                    onMouseEnter={() => setPenColor(c.value)}
                     onClick={() => setPenColor(c.value)}
                     className="rounded-full transition-all duration-100 focus:outline-none"
                     style={{
