@@ -48,42 +48,56 @@ function normalizeArabic(text: string): string {
 
 // ─── data helpers ─────────────────────────────────────────────────────────────
 
+// Surahs where ayah 1 begins with the standalone Bismillah (not surah 1 or 9)
+function needsBismillahHeader(surahNum: number): boolean {
+  return surahNum !== 1 && surahNum !== 9;
+}
+
 function ayahsToWords(
   surahNum: number,
   ayahs: Ayah[],
   startAyah = 1,
-  endAyah = Infinity
+  endAyah = Infinity,
+  stripBismillah = false
 ): TestWord[] {
   return ayahs
     .filter((a) => a.numberInSurah >= startAyah && a.numberInSurah <= endAyah)
-    .flatMap((ayah) =>
-      ayah.text
-        .split(/\s+/)
-        .filter(Boolean)
-        .map((word, idx) => ({
-          id: `${surahNum}-${ayah.numberInSurah}-${idx}`,
-          text: word,
-          surahNum,
-          ayahNum: ayah.numberInSurah,
-          wordIdx: idx,
-        }))
-    );
+    .flatMap((ayah) => {
+      const allWords = ayah.text.split(/\s+/).filter(Boolean);
+      // Strip first 4 words (Bismillah) from ayah 1 when requested
+      const doStrip = stripBismillah && ayah.numberInSurah === 1;
+      const wordTexts = doStrip ? allWords.slice(4) : allWords;
+      const offset = doStrip ? 4 : 0;
+      return wordTexts.map((word, idx) => ({
+        id: `${surahNum}-${ayah.numberInSurah}-${idx + offset}`,
+        text: word,
+        surahNum,
+        ayahNum: ayah.numberInSurah,
+        wordIdx: idx + offset,
+      }));
+    });
 }
 
 function sectionsToWords(sections: PageSection[]): TestWord[] {
   return sections.flatMap((sec) =>
-    sec.ayahs.flatMap((ayah) =>
-      ayah.text
-        .split(/\s+/)
-        .filter(Boolean)
-        .map((word, idx) => ({
-          id: `${sec.surah.number}-${ayah.numberInSurah}-${idx}`,
-          text: word,
-          surahNum: sec.surah.number,
-          ayahNum: ayah.numberInSurah,
-          wordIdx: idx,
-        }))
-    )
+    sec.ayahs.flatMap((ayah) => {
+      // Strip Bismillah when this section begins at ayah 1 of an eligible surah
+      const sectionStartsAtAyah1 = sec.ayahs[0]?.numberInSurah === 1;
+      const doStrip =
+        needsBismillahHeader(sec.surah.number) &&
+        sectionStartsAtAyah1 &&
+        ayah.numberInSurah === 1;
+      const allWords = ayah.text.split(/\s+/).filter(Boolean);
+      const wordTexts = doStrip ? allWords.slice(4) : allWords;
+      const offset = doStrip ? 4 : 0;
+      return wordTexts.map((word, idx) => ({
+        id: `${sec.surah.number}-${ayah.numberInSurah}-${idx + offset}`,
+        text: word,
+        surahNum: sec.surah.number,
+        ayahNum: ayah.numberInSurah,
+        wordIdx: idx + offset,
+      }));
+    })
   );
 }
 
@@ -229,12 +243,14 @@ export default function TestPage() {
       const endA = scope.endAyah
         ? parseInt(scope.endAyah, 10)
         : surahQuery.data.numberOfAyahs;
-      return ayahsToWords(scope.surahNum, surahQuery.data.ayahs, startA, endA);
+      const stripBismillah = startA <= 1 && needsBismillahHeader(scope.surahNum);
+      return ayahsToWords(scope.surahNum, surahQuery.data.ayahs, startA, endA, stripBismillah);
     }
 
     if (scope.type === "verse" && surahQuery.data) {
       const ayahNum = scope.startAyah ? parseInt(scope.startAyah, 10) : 1;
-      return ayahsToWords(scope.surahNum, surahQuery.data.ayahs, ayahNum, ayahNum);
+      const stripBismillah = ayahNum === 1 && needsBismillahHeader(scope.surahNum);
+      return ayahsToWords(scope.surahNum, surahQuery.data.ayahs, ayahNum, ayahNum, stripBismillah);
     }
 
     if (scope.type === "page" && pageQuery.data) {
@@ -250,6 +266,34 @@ export default function TestPage() {
 
     return [];
   }, [committed, scope, surahQuery.data, pageQuery.data, juzResults]);
+
+  // Track which surah numbers had their Bismillah stripped (need a header)
+  const bismillahSurahs = useMemo<Set<number>>(() => {
+    const s = new Set<number>();
+    if (!committed) return s;
+
+    if (scope.type === "surah") {
+      const startA = scope.startAyah ? parseInt(scope.startAyah, 10) : 1;
+      if (startA <= 1 && needsBismillahHeader(scope.surahNum)) s.add(scope.surahNum);
+    } else if (scope.type === "verse") {
+      const ayahNum = scope.startAyah ? parseInt(scope.startAyah, 10) : 1;
+      if (ayahNum === 1 && needsBismillahHeader(scope.surahNum)) s.add(scope.surahNum);
+    } else {
+      const sections =
+        scope.type === "page"
+          ? (pageQuery.data ?? [])
+          : juzResults.flatMap((r) => r.data ?? []);
+      for (const sec of sections) {
+        if (
+          needsBismillahHeader(sec.surah.number) &&
+          sec.ayahs[0]?.numberInSurah === 1
+        ) {
+          s.add(sec.surah.number);
+        }
+      }
+    }
+    return s;
+  }, [committed, scope, pageQuery.data, juzResults]);
 
   const isLoading =
     committed &&
@@ -357,19 +401,30 @@ export default function TestPage() {
       : 0;
   const currentWordId = testWords[processedCount]?.id;
 
-  // Group words by ayah for display
-  const ayahGroups = useMemo(() => {
-    const groups: { surahNum: number; ayahNum: number; words: TestWord[] }[] = [];
+  // Group words by surah → ayah for display (to insert Bismillah headers per surah)
+  const surahGroups = useMemo(() => {
+    type AyahGroup = { ayahNum: number; words: TestWord[] };
+    type SurahGroup = { surahNum: number; showBismillah: boolean; ayahGroups: AyahGroup[] };
+    const groups: SurahGroup[] = [];
     for (const word of testWords) {
-      const last = groups[groups.length - 1];
-      if (last && last.surahNum === word.surahNum && last.ayahNum === word.ayahNum) {
-        last.words.push(word);
+      const lastSurah = groups[groups.length - 1];
+      if (!lastSurah || lastSurah.surahNum !== word.surahNum) {
+        groups.push({
+          surahNum: word.surahNum,
+          showBismillah: bismillahSurahs.has(word.surahNum),
+          ayahGroups: [{ ayahNum: word.ayahNum, words: [word] }],
+        });
       } else {
-        groups.push({ surahNum: word.surahNum, ayahNum: word.ayahNum, words: [word] });
+        const lastAyah = lastSurah.ayahGroups[lastSurah.ayahGroups.length - 1];
+        if (!lastAyah || lastAyah.ayahNum !== word.ayahNum) {
+          lastSurah.ayahGroups.push({ ayahNum: word.ayahNum, words: [word] });
+        } else {
+          lastAyah.words.push(word);
+        }
       }
     }
     return groups;
-  }, [testWords]);
+  }, [testWords, bismillahSurahs]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Render: Setup
@@ -751,20 +806,31 @@ export default function TestPage() {
         )}
 
         <div dir="rtl" className="text-right">
-          {ayahGroups.map((group) => (
-            <span key={`${group.surahNum}-${group.ayahNum}`}>
-              {group.words.map((word) => (
-                <WordBadge
-                  key={word.id}
-                  word={word}
-                  isCurrent={phase === "testing" && word.id === currentWordId}
-                  status={wordStatuses[word.id]}
-                />
+          {surahGroups.map((surah) => (
+            <div key={surah.surahNum}>
+              {surah.showBismillah && (
+                <div dir="rtl" className="text-center py-5 mb-1 border-b border-border/40">
+                  <span className="font-serif text-primary [letter-spacing:0.06em] text-[2rem] sm:text-[2.4rem] leading-loose">
+                    بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ
+                  </span>
+                </div>
+              )}
+              {surah.ayahGroups.map((group) => (
+                <span key={`${surah.surahNum}-${group.ayahNum}`}>
+                  {group.words.map((word) => (
+                    <WordBadge
+                      key={word.id}
+                      word={word}
+                      isCurrent={phase === "testing" && word.id === currentWordId}
+                      status={wordStatuses[word.id]}
+                    />
+                  ))}
+                  <span className="inline-block text-primary/70 text-sm mx-2 font-serif leading-[3.5]">
+                    ﴿{group.ayahNum}﴾
+                  </span>
+                </span>
               ))}
-              <span className="inline-block text-primary/70 text-sm mx-2 font-serif leading-[3.5]">
-                ﴿{group.ayahNum}﴾
-              </span>
-            </span>
+            </div>
           ))}
         </div>
 
