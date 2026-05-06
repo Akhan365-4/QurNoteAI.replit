@@ -34,16 +34,78 @@ interface SurahDetailsData extends SurahBase {
 
 // ─── arabic normalisation ──────────────────────────────────────────────────────
 
+/**
+ * Aggressively normalise an Arabic word so that Uthmani-script spellings and
+ * speech-recogniser output can be compared fairly.
+ *
+ * Key differences handled:
+ *  - All tashkeel / diacritics / Quranic annotations stripped
+ *  - Every alef variant (آأإٱٲٳٵ) → bare alef (ا)
+ *  - Alef maqsura (ى) → ya (ي)
+ *  - Ta marbuta (ة) → ha (ه)
+ *  - Waw with hamza (ؤ) → waw (و)
+ *  - Ya with hamza (ئ) → ya (ي)
+ *  - Tatweel (ـ) stripped
+ *  - Common Uthmani "waw" vowel spellings (e.g. الصلوة → الصله after further
+ *    normalisation) will naturally be within edit-distance tolerance
+ */
 function normalizeArabic(text: string): string {
   return text
-    .replace(/[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06ED]/g, "")
+    // Strip all Arabic diacritics, Quranic marks, and Uthmani annotations
+    .replace(/[\u0600-\u0605\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06ED]/g, "")
+    // Strip tatweel
     .replace(/\u0640/g, "")
-    .replace(/[\u0622\u0623\u0625\u0671]/g, "\u0627")
+    // Normalise all alef variants → bare alef
+    .replace(/[\u0622\u0623\u0625\u0671\u0672\u0673\u0675]/g, "\u0627")
+    // Ta marbuta → ha
     .replace(/\u0629/g, "\u0647")
+    // Alef maqsura → ya
     .replace(/\u0649/g, "\u064A")
+    // Waw with hamza → waw
     .replace(/\u0624/g, "\u0648")
+    // Ya with hamza → ya
     .replace(/\u0626/g, "\u064A")
     .trim();
+}
+
+// ─── fuzzy word matching ───────────────────────────────────────────────────────
+
+/** Character-level Levenshtein distance (space-optimised). */
+function levenshtein(a: string, b: string): number {
+  if (a === b) return 0;
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+  const row = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    let prev = row[0];
+    row[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const temp = row[j];
+      row[j] =
+        a[i - 1] === b[j - 1]
+          ? prev
+          : 1 + Math.min(prev, row[j], row[j - 1]);
+      prev = temp;
+    }
+  }
+  return row[b.length];
+}
+
+/**
+ * Returns true when two normalised words are close enough to count as a match.
+ * Tolerance scales with word length so short words need a tighter fit:
+ *   ≤ 3 chars  → exact only (threshold 0)
+ *   4–6 chars  → 1 edit allowed
+ *   7+ chars   → 2 edits allowed
+ * This covers Uthmani spelling differences (waw↔alef, dropped letters, etc.)
+ * without being so loose that clearly wrong words pass.
+ */
+function wordsMatch(spokenNorm: string, expectedNorm: string): boolean {
+  if (spokenNorm === expectedNorm) return true;
+  const maxLen = Math.max(spokenNorm.length, expectedNorm.length);
+  const threshold = maxLen <= 3 ? 0 : maxLen <= 6 ? 1 : 2;
+  if (threshold === 0) return false;
+  return levenshtein(spokenNorm, expectedNorm) <= threshold;
 }
 
 // ─── data helpers ─────────────────────────────────────────────────────────────
@@ -315,17 +377,46 @@ export default function TestPage() {
   // ── speech processing ─────────────────────────────────────────────────────
 
   const processFinalResult = useCallback((transcript: string) => {
-    const words = transcript.split(/\s+/).filter(Boolean);
+    const spokenWords = transcript.split(/\s+/).filter(Boolean);
+    const testWords = testWordsRef.current;
     const updates: Record<string, WordStatus> = {};
     let count = processedCountRef.current;
 
-    for (const word of words) {
-      if (count >= testWordsRef.current.length) break;
-      const normalized = normalizeArabic(word);
-      const expected = normalizeArabic(testWordsRef.current[count].text);
-      updates[testWordsRef.current[count].id] =
-        normalized === expected ? "correct" : "mistake";
-      count++;
+    // How many expected words ahead to search when the current word doesn't match.
+    // This re-syncs the pointer if the recogniser drops or garbles a word so
+    // subsequent correct words are not cascaded as mistakes.
+    const LOOKAHEAD = 2;
+
+    for (const spoken of spokenWords) {
+      if (count >= testWords.length) break;
+      const spokenNorm = normalizeArabic(spoken);
+      const expectedNorm = normalizeArabic(testWords[count].text);
+
+      if (wordsMatch(spokenNorm, expectedNorm)) {
+        updates[testWords[count].id] = "correct";
+        count++;
+      } else {
+        // Look ahead: if the spoken word matches a nearby expected word, the
+        // user likely skipped words — mark skipped ones as mistakes and re-sync.
+        let foundAt = -1;
+        for (let k = 1; k <= LOOKAHEAD && count + k < testWords.length; k++) {
+          if (wordsMatch(spokenNorm, normalizeArabic(testWords[count + k].text))) {
+            foundAt = k;
+            break;
+          }
+        }
+
+        if (foundAt > 0) {
+          for (let k = 0; k < foundAt; k++) {
+            updates[testWords[count + k].id] = "mistake";
+          }
+          updates[testWords[count + foundAt].id] = "correct";
+          count += foundAt + 1;
+        } else {
+          updates[testWords[count].id] = "mistake";
+          count++;
+        }
+      }
     }
 
     if (Object.keys(updates).length > 0) {
@@ -333,7 +424,7 @@ export default function TestPage() {
       setProcessedCount(count);
       setWordStatuses((prev) => ({ ...prev, ...updates }));
 
-      if (count >= testWordsRef.current.length) {
+      if (count >= testWords.length) {
         setPhase("done");
         stopRef.current?.();
       }
