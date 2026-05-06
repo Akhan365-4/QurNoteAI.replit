@@ -46,104 +46,6 @@ function normalizeArabic(text: string): string {
     .trim();
 }
 
-// ─── sequence alignment ────────────────────────────────────────────────────────
-
-type AlignType = "match" | "mismatch" | "skipped";
-
-interface AlignedItem {
-  expectedIdx: number;
-  type: AlignType;
-}
-
-/**
- * DP sequence alignment of spoken words against a slice of expected words.
- *
- * Operations and costs:
- *   match         → 0    (spoken word equals expected word)
- *   mismatch      → 1    (spoken word replaces expected word)
- *   skip-expected → 1    (user omitted an expected word)
- *   extra-spoken  → 0.3  (noise / misrecognition — discard the spoken word)
- *
- * A low cost for extra spoken words lets the algorithm absorb recognition
- * artifacts without derailing alignment, while a higher cost for skipping
- * keeps the pointer from jumping ahead unnecessarily.
- */
-function alignSpokenToExpected(
-  spoken: string[],
-  expected: string[]
-): AlignedItem[] {
-  const m = spoken.length;
-  const n = expected.length;
-  const SKIP_COST = 1;
-  const EXTRA_COST = 0.3;
-
-  const dp = Array.from({ length: m + 1 }, () =>
-    new Array<number>(n + 1).fill(Infinity)
-  );
-  const from = Array.from({ length: m + 1 }, () =>
-    new Array<string>(n + 1).fill("")
-  );
-
-  dp[0][0] = 0;
-  for (let j = 1; j <= n; j++) {
-    dp[0][j] = j * SKIP_COST;
-    from[0][j] = "skip";
-  }
-  for (let i = 1; i <= m; i++) {
-    dp[i][0] = i * EXTRA_COST;
-    from[i][0] = "extra";
-  }
-
-  for (let i = 1; i <= m; i++) {
-    for (let j = 1; j <= n; j++) {
-      const isMatch = spoken[i - 1] === expected[j - 1];
-      const subCost = dp[i - 1][j - 1] + (isMatch ? 0 : 1);
-      const skipCost = dp[i][j - 1] + SKIP_COST;
-      const extraCost = dp[i - 1][j] + EXTRA_COST;
-
-      if (subCost <= skipCost && subCost <= extraCost) {
-        dp[i][j] = subCost;
-        from[i][j] = isMatch ? "match" : "mismatch";
-      } else if (skipCost <= extraCost) {
-        dp[i][j] = skipCost;
-        from[i][j] = "skip";
-      } else {
-        dp[i][j] = extraCost;
-        from[i][j] = "extra";
-      }
-    }
-  }
-
-  // Traceback
-  const result: AlignedItem[] = [];
-  let i = m, j = n;
-  while (i > 0 || j > 0) {
-    if (i === 0) {
-      result.unshift({ expectedIdx: j - 1, type: "skipped" });
-      j--;
-    } else if (j === 0) {
-      i--; // extra spoken word — discard
-    } else {
-      const op = from[i][j];
-      if (op === "skip") {
-        result.unshift({ expectedIdx: j - 1, type: "skipped" });
-        j--;
-      } else if (op === "extra") {
-        i--;
-      } else {
-        result.unshift({
-          expectedIdx: j - 1,
-          type: op === "match" ? "match" : "mismatch",
-        });
-        i--;
-        j--;
-      }
-    }
-  }
-
-  return result;
-}
-
 // ─── data helpers ─────────────────────────────────────────────────────────────
 
 // Surahs where ayah 1 begins with the standalone Bismillah (not surah 1 or 9)
@@ -413,49 +315,28 @@ export default function TestPage() {
   // ── speech processing ─────────────────────────────────────────────────────
 
   const processFinalResult = useCallback((transcript: string) => {
-    const allWords = testWordsRef.current;
-    const count = processedCountRef.current;
-    if (count >= allWords.length) return;
-
-    const spoken = transcript.split(/\s+/).filter(Boolean).map(normalizeArabic);
-    if (spoken.length === 0) return;
-
-    // Align against a window of expected words.
-    // Buffer allows the DP to absorb a few skipped words without
-    // mis-consuming words that haven't been said yet.
-    const WINDOW_BUFFER = 5;
-    const windowEnd = Math.min(count + spoken.length + WINDOW_BUFFER, allWords.length);
-    const slice = allWords.slice(count, windowEnd);
-    const expectedNorm = slice.map((w) => normalizeArabic(w.text));
-
-    const alignment = alignSpokenToExpected(spoken, expectedNorm);
-
-    // Only commit results up to the furthest expected word that had a spoken
-    // word explicitly aligned to it (match or mismatch). Words beyond that
-    // point are still unspoken — don't mark them yet.
-    let lastConsumedIdx = -1;
-    for (const item of alignment) {
-      if (item.type !== "skipped") {
-        lastConsumedIdx = Math.max(lastConsumedIdx, item.expectedIdx);
-      }
-    }
-    if (lastConsumedIdx < 0) return;
-
+    const words = transcript.split(/\s+/).filter(Boolean);
     const updates: Record<string, WordStatus> = {};
-    for (const item of alignment) {
-      if (item.expectedIdx > lastConsumedIdx) break;
-      const word = slice[item.expectedIdx];
-      if (word) updates[word.id] = item.type === "match" ? "correct" : "mistake";
+    let count = processedCountRef.current;
+
+    for (const word of words) {
+      if (count >= testWordsRef.current.length) break;
+      const normalized = normalizeArabic(word);
+      const expected = normalizeArabic(testWordsRef.current[count].text);
+      updates[testWordsRef.current[count].id] =
+        normalized === expected ? "correct" : "mistake";
+      count++;
     }
 
-    const newCount = count + lastConsumedIdx + 1;
-    processedCountRef.current = newCount;
-    setProcessedCount(newCount);
-    setWordStatuses((prev) => ({ ...prev, ...updates }));
+    if (Object.keys(updates).length > 0) {
+      processedCountRef.current = count;
+      setProcessedCount(count);
+      setWordStatuses((prev) => ({ ...prev, ...updates }));
 
-    if (newCount >= allWords.length) {
-      setPhase("done");
-      stopRef.current?.();
+      if (count >= testWordsRef.current.length) {
+        setPhase("done");
+        stopRef.current?.();
+      }
     }
   }, []);
 
