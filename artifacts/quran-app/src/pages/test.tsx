@@ -307,23 +307,50 @@ export default function TestPage() {
   // ── derive test words ─────────────────────────────────────────────────────
 
   // Derive the ayah range from the selected page range within a surah
-  const pageRangeDerived = useMemo<{ startA: number; endA: number } | null>(() => {
+  const pageRangeDerived = useMemo<{
+    startA: number;
+    endA: number;
+    totalPages: number;
+    outOfRange: boolean;
+  } | null>(() => {
     if (scope.type !== "surah" || scope.rangeMode !== "page" || !surahQuery.data) return null;
     const ayahs = surahQuery.data.ayahs;
-    const fromPageNum = scope.fromPage ? parseInt(scope.fromPage, 10) : NaN;
-    const toPageNum = scope.toPage ? parseInt(scope.toPage, 10) : NaN;
 
-    // First ayah in the surah whose page >= fromPage
-    const startA = !isNaN(fromPageNum)
-      ? (ayahs.find((a) => a.page >= fromPageNum)?.numberInSurah ?? 1)
-      : 1;
-    // Last ayah in the surah whose page <= toPage
-    const endA = !isNaN(toPageNum)
-      ? ([...ayahs].reverse().find((a) => a.page <= toPageNum)?.numberInSurah ??
-          surahQuery.data.numberOfAyahs)
-      : surahQuery.data.numberOfAyahs;
+    // Build an ordered list of unique Quran page numbers that contain this surah
+    const surahPages: number[] = [];
+    const seen = new Set<number>();
+    for (const a of ayahs) {
+      if (!seen.has(a.page)) {
+        seen.add(a.page);
+        surahPages.push(a.page);
+      }
+    }
+    const totalPages = surahPages.length;
 
-    return { startA, endA };
+    // Treat user input as 1-based surah-relative page positions
+    const fromNum = scope.fromPage ? parseInt(scope.fromPage, 10) : 1;
+    const toNum = scope.toPage ? parseInt(scope.toPage, 10) : totalPages;
+    const fromIdx = fromNum - 1; // 0-based
+    const toIdx = toNum - 1;
+
+    const outOfRange =
+      isNaN(fromNum) || isNaN(toNum) ||
+      fromIdx < 0 || toIdx >= totalPages || fromIdx > toIdx;
+
+    if (outOfRange) {
+      return { startA: 1, endA: surahQuery.data.numberOfAyahs, totalPages, outOfRange: true };
+    }
+
+    const fromAbsPage = surahPages[fromIdx];
+    const toAbsPage = surahPages[toIdx];
+
+    // First ayah on the from-page, last ayah on the to-page
+    const startA = ayahs.find((a) => a.page === fromAbsPage)?.numberInSurah ?? 1;
+    const endA =
+      [...ayahs].reverse().find((a) => a.page === toAbsPage)?.numberInSurah ??
+      surahQuery.data.numberOfAyahs;
+
+    return { startA, endA, totalPages, outOfRange: false };
   }, [scope.type, scope.rangeMode, scope.fromPage, scope.toPage, surahQuery.data]);
 
   const testWords = useMemo<TestWord[]>(() => {
@@ -712,12 +739,17 @@ export default function TestPage() {
                       <div className="flex-1">
                         <label className="text-sm font-medium mb-1.5 block text-muted-foreground">
                           From Page
+                          {pageRangeDerived && (
+                            <span className="ml-1 font-normal text-muted-foreground/70">
+                              (1–{pageRangeDerived.totalPages})
+                            </span>
+                          )}
                         </label>
                         <Input
                           type="number"
                           min={1}
-                          max={604}
-                          placeholder="e.g. 50"
+                          max={pageRangeDerived?.totalPages ?? 604}
+                          placeholder="e.g. 1"
                           value={scope.fromPage}
                           onChange={(e) => setScope((s) => ({ ...s, fromPage: e.target.value }))}
                           className="bg-background [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
@@ -726,12 +758,17 @@ export default function TestPage() {
                       <div className="flex-1">
                         <label className="text-sm font-medium mb-1.5 block text-muted-foreground">
                           To Page
+                          {pageRangeDerived && (
+                            <span className="ml-1 font-normal text-muted-foreground/70">
+                              (1–{pageRangeDerived.totalPages})
+                            </span>
+                          )}
                         </label>
                         <Input
                           type="number"
                           min={1}
-                          max={604}
-                          placeholder="e.g. 53"
+                          max={pageRangeDerived?.totalPages ?? 604}
+                          placeholder={pageRangeDerived ? `e.g. ${pageRangeDerived.totalPages}` : "Last"}
                           value={scope.toPage}
                           onChange={(e) => setScope((s) => ({ ...s, toPage: e.target.value }))}
                           className="bg-background [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
@@ -739,14 +776,25 @@ export default function TestPage() {
                       </div>
                     </div>
 
-                    {/* Derived ayah range hint */}
-                    {surahQuery.isLoading && (scope.fromPage || scope.toPage) && (
+                    {/* Loading state */}
+                    {surahQuery.isLoading && (
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <Loader2 className="h-3 w-3 animate-spin" />
-                        Loading ayah info…
+                        Loading surah page info…
                       </div>
                     )}
-                    {pageRangeDerived && (scope.fromPage || scope.toPage) && !surahQuery.isLoading && (
+
+                    {/* Out-of-range warning */}
+                    {pageRangeDerived?.outOfRange && (scope.fromPage || scope.toPage) && !surahQuery.isLoading && (
+                      <div className="flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                        <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                        This surah spans {pageRangeDerived.totalPages} page
+                        {pageRangeDerived.totalPages !== 1 ? "s" : ""}. Enter values between 1 and {pageRangeDerived.totalPages}.
+                      </div>
+                    )}
+
+                    {/* Valid derived ayah range hint */}
+                    {pageRangeDerived && !pageRangeDerived.outOfRange && (scope.fromPage || scope.toPage) && !surahQuery.isLoading && (
                       <div className="flex items-center gap-1.5 text-xs text-primary bg-primary/5 border border-primary/15 rounded-lg px-3 py-2">
                         <BookOpen className="h-3.5 w-3.5 shrink-0" />
                         <span>
@@ -754,7 +802,8 @@ export default function TestPage() {
                           <span className="font-semibold">Ayah {pageRangeDerived.startA}</span>
                           {pageRangeDerived.endA !== pageRangeDerived.startA && (
                             <>
-                              {" "}– <span className="font-semibold">Ayah {pageRangeDerived.endA}</span>
+                              {" "}–{" "}
+                              <span className="font-semibold">Ayah {pageRangeDerived.endA}</span>
                             </>
                           )}
                         </span>
