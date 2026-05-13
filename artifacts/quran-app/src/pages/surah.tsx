@@ -26,6 +26,11 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+const ARABIC_DIGITS = "٠١٢٣٤٥٦٧٨٩";
+function toEasternArabic(n: number): string {
+  return String(n).replace(/\d/g, (d) => ARABIC_DIGITS[parseInt(d)]);
+}
+
 const BISMILLAH = "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ";
 
 export default function Surah() {
@@ -531,8 +536,11 @@ export default function Surah() {
                           })}
 
                           {/* Ayah number badge */}
-                          <span className="inline-flex items-center justify-center w-10 h-10 mx-3 rounded-full border-2 border-accent text-accent-foreground font-serif text-lg bg-accent/5 relative -top-2 select-none shadow-sm">
-                            {ayah.numberInSurah}
+                          <span
+                            className="inline-flex items-center justify-center w-10 h-10 mx-3 rounded-full border-2 border-primary/50 text-primary font-bold bg-primary/10 relative -top-2 select-none"
+                            style={{ boxShadow: "0 0 0 2px hsl(var(--primary) / 0.15)" }}
+                          >
+                            {toEasternArabic(ayah.numberInSurah)}
                           </span>
                         </div>
 
