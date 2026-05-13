@@ -111,6 +111,11 @@ function wordsMatch(spokenNorm: string, expectedNorm: string): boolean {
 // ─── data helpers ─────────────────────────────────────────────────────────────
 
 // Surahs where ayah 1 begins with the standalone Bismillah (not surah 1 or 9)
+const ARABIC_DIGITS = "٠١٢٣٤٥٦٧٨٩";
+function toEasternArabic(n: number): string {
+  return String(n).replace(/\d/g, (d) => ARABIC_DIGITS[parseInt(d)]);
+}
+
 function needsBismillahHeader(surahNum: number): boolean {
   return surahNum !== 1 && surahNum !== 9;
 }
@@ -1095,8 +1100,17 @@ export default function TestPage() {
                       status={wordStatuses[word.id]}
                     />
                   ))}
-                  <span className="inline-block text-primary/70 text-sm mx-2 font-serif leading-[3.5]">
-                    ﴿{group.ayahNum}﴾
+                  {/* Ayah-end ornament */}
+                  <span
+                    className="inline-flex items-center justify-center mx-2 select-none align-middle"
+                    style={{ width: "2em", height: "2em", verticalAlign: "middle" }}
+                  >
+                    <span
+                      className="relative inline-flex items-center justify-center rounded-full bg-primary/10 border-2 border-primary/50 text-primary font-bold leading-none"
+                      style={{ width: "1.9em", height: "1.9em", fontSize: "0.8rem", boxShadow: "0 0 0 2px hsl(var(--primary) / 0.15)" }}
+                    >
+                      {toEasternArabic(group.ayahNum)}
+                    </span>
                   </span>
                 </span>
               ))}
