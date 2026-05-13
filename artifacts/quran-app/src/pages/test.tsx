@@ -206,6 +206,10 @@ interface ScopeState {
   endAyah: string;
   pageNum: string;
   juzNum: number;
+  // surah-scope page-range mode
+  rangeMode: "ayah" | "page";
+  fromPage: string;
+  toPage: string;
 }
 
 const defaultScope: ScopeState = {
@@ -215,6 +219,9 @@ const defaultScope: ScopeState = {
   endAyah: "",
   pageNum: "1",
   juzNum: 1,
+  rangeMode: "ayah",
+  fromPage: "",
+  toPage: "",
 };
 
 // ─── word status display ──────────────────────────────────────────────────────
@@ -267,7 +274,9 @@ export default function TestPage() {
     queryKey: ["surah", scope.surahNum],
     queryFn: () => fetchSurah(scope.surahNum),
     enabled:
-      committed && (scope.type === "surah" || scope.type === "verse"),
+      // Load eagerly in setup when user is picking pages so we can show the ayah hint
+      (scope.type === "surah" && scope.rangeMode === "page") ||
+      (committed && (scope.type === "surah" || scope.type === "verse")),
     staleTime: Infinity,
   });
 
@@ -297,14 +306,39 @@ export default function TestPage() {
 
   // ── derive test words ─────────────────────────────────────────────────────
 
+  // Derive the ayah range from the selected page range within a surah
+  const pageRangeDerived = useMemo<{ startA: number; endA: number } | null>(() => {
+    if (scope.type !== "surah" || scope.rangeMode !== "page" || !surahQuery.data) return null;
+    const ayahs = surahQuery.data.ayahs;
+    const fromPageNum = scope.fromPage ? parseInt(scope.fromPage, 10) : NaN;
+    const toPageNum = scope.toPage ? parseInt(scope.toPage, 10) : NaN;
+
+    // First ayah in the surah whose page >= fromPage
+    const startA = !isNaN(fromPageNum)
+      ? (ayahs.find((a) => a.page >= fromPageNum)?.numberInSurah ?? 1)
+      : 1;
+    // Last ayah in the surah whose page <= toPage
+    const endA = !isNaN(toPageNum)
+      ? ([...ayahs].reverse().find((a) => a.page <= toPageNum)?.numberInSurah ??
+          surahQuery.data.numberOfAyahs)
+      : surahQuery.data.numberOfAyahs;
+
+    return { startA, endA };
+  }, [scope.type, scope.rangeMode, scope.fromPage, scope.toPage, surahQuery.data]);
+
   const testWords = useMemo<TestWord[]>(() => {
     if (!committed) return [];
 
     if (scope.type === "surah" && surahQuery.data) {
-      const startA = scope.startAyah ? parseInt(scope.startAyah, 10) : 1;
-      const endA = scope.endAyah
-        ? parseInt(scope.endAyah, 10)
-        : surahQuery.data.numberOfAyahs;
+      let startA: number;
+      let endA: number;
+      if (scope.rangeMode === "page" && pageRangeDerived) {
+        startA = pageRangeDerived.startA;
+        endA = pageRangeDerived.endA;
+      } else {
+        startA = scope.startAyah ? parseInt(scope.startAyah, 10) : 1;
+        endA = scope.endAyah ? parseInt(scope.endAyah, 10) : surahQuery.data.numberOfAyahs;
+      }
       const stripBismillah = startA <= 1 && needsBismillahHeader(scope.surahNum);
       return ayahsToWords(scope.surahNum, surahQuery.data.ayahs, startA, endA, stripBismillah);
     }
@@ -335,7 +369,12 @@ export default function TestPage() {
     if (!committed) return s;
 
     if (scope.type === "surah") {
-      const startA = scope.startAyah ? parseInt(scope.startAyah, 10) : 1;
+      const startA =
+        scope.rangeMode === "page" && pageRangeDerived
+          ? pageRangeDerived.startA
+          : scope.startAyah
+          ? parseInt(scope.startAyah, 10)
+          : 1;
       if (startA <= 1 && needsBismillahHeader(scope.surahNum)) s.add(scope.surahNum);
     } else if (scope.type === "verse") {
       const ayahNum = scope.startAyah ? parseInt(scope.startAyah, 10) : 1;
@@ -591,6 +630,8 @@ export default function TestPage() {
                           surahNum: Number(e.target.value),
                           startAyah: "",
                           endAyah: "",
+                          fromPage: "",
+                          toPage: "",
                         }))
                       }
                       className="w-full appearance-none bg-background border border-border rounded-lg px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
@@ -604,34 +645,123 @@ export default function TestPage() {
                     <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                   </div>
                 </div>
-                <div className="flex gap-3">
-                  <div className="flex-1">
-                    <label className="text-sm font-medium mb-1.5 block text-muted-foreground">
-                      From Ayah (optional)
-                    </label>
-                    <Input
-                      type="number"
-                      min={1}
-                      placeholder="1"
-                      value={scope.startAyah}
-                      onChange={(e) => setScope((s) => ({ ...s, startAyah: e.target.value }))}
-                      className="bg-background [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <label className="text-sm font-medium mb-1.5 block text-muted-foreground">
-                      To Ayah (optional)
-                    </label>
-                    <Input
-                      type="number"
-                      min={1}
-                      placeholder="Last"
-                      value={scope.endAyah}
-                      onChange={(e) => setScope((s) => ({ ...s, endAyah: e.target.value }))}
-                      className="bg-background [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                    />
-                  </div>
+
+                {/* Range mode toggle */}
+                <div className="flex gap-2">
+                  {(["ayah", "page"] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      onClick={() =>
+                        setScope((s) => ({
+                          ...s,
+                          rangeMode: mode,
+                          startAyah: "",
+                          endAyah: "",
+                          fromPage: "",
+                          toPage: "",
+                        }))
+                      }
+                      className={cn(
+                        "px-3 py-1.5 rounded-full text-xs font-medium border transition-all cursor-pointer",
+                        scope.rangeMode === mode
+                          ? "bg-primary/10 text-primary border-primary/30"
+                          : "bg-card border-border text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      {mode === "ayah" ? "By Ayah" : "By Page"}
+                    </button>
+                  ))}
                 </div>
+
+                {/* By-Ayah inputs */}
+                {scope.rangeMode === "ayah" && (
+                  <div className="flex gap-3">
+                    <div className="flex-1">
+                      <label className="text-sm font-medium mb-1.5 block text-muted-foreground">
+                        From Ayah (optional)
+                      </label>
+                      <Input
+                        type="number"
+                        min={1}
+                        placeholder="1"
+                        value={scope.startAyah}
+                        onChange={(e) => setScope((s) => ({ ...s, startAyah: e.target.value }))}
+                        className="bg-background [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <label className="text-sm font-medium mb-1.5 block text-muted-foreground">
+                        To Ayah (optional)
+                      </label>
+                      <Input
+                        type="number"
+                        min={1}
+                        placeholder="Last"
+                        value={scope.endAyah}
+                        onChange={(e) => setScope((s) => ({ ...s, endAyah: e.target.value }))}
+                        className="bg-background [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* By-Page inputs */}
+                {scope.rangeMode === "page" && (
+                  <div className="space-y-3">
+                    <div className="flex gap-3">
+                      <div className="flex-1">
+                        <label className="text-sm font-medium mb-1.5 block text-muted-foreground">
+                          From Page
+                        </label>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={604}
+                          placeholder="e.g. 50"
+                          value={scope.fromPage}
+                          onChange={(e) => setScope((s) => ({ ...s, fromPage: e.target.value }))}
+                          className="bg-background [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <label className="text-sm font-medium mb-1.5 block text-muted-foreground">
+                          To Page
+                        </label>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={604}
+                          placeholder="e.g. 53"
+                          value={scope.toPage}
+                          onChange={(e) => setScope((s) => ({ ...s, toPage: e.target.value }))}
+                          className="bg-background [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Derived ayah range hint */}
+                    {surahQuery.isLoading && (scope.fromPage || scope.toPage) && (
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Loading ayah info…
+                      </div>
+                    )}
+                    {pageRangeDerived && (scope.fromPage || scope.toPage) && !surahQuery.isLoading && (
+                      <div className="flex items-center gap-1.5 text-xs text-primary bg-primary/5 border border-primary/15 rounded-lg px-3 py-2">
+                        <BookOpen className="h-3.5 w-3.5 shrink-0" />
+                        <span>
+                          Corresponds to{" "}
+                          <span className="font-semibold">Ayah {pageRangeDerived.startA}</span>
+                          {pageRangeDerived.endA !== pageRangeDerived.startA && (
+                            <>
+                              {" "}– <span className="font-semibold">Ayah {pageRangeDerived.endA}</span>
+                            </>
+                          )}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </>
             )}
 
